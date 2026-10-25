@@ -7,9 +7,11 @@ import { Sheet } from "./Sheet";
 import { Button, StatusDot, WarnBadge } from "./ui";
 
 export function TableSheet({ id }: { id: string }) {
-  const { state, d, closeSheet, openSheet, setTableSign, reserveSeat, unreserve, deleteTable, moveTo, ackWarning, startMove, setChecked, busy } = useStore();
+  const { state, d, closeSheet, openSheet, setTableSign, reserveSeat, unreserve, deleteTable, moveTo, ackWarning, startMove, setChecked, setSeatOrder, busy } = useStore();
   // guest whose "เอาออก" was tapped and whose party has several people here: ask whole group or just them
   const [askRemove, setAskRemove] = useState<string | null>(null);
+  // seat number tapped first when re-ordering; the next seat tapped is where that person goes
+  const [pickSeat, setPickSeat] = useState<number | null>(null);
   if (!state || !d) return null;
   const table = d.tableById.get(id);
   if (!table) return null;
@@ -28,6 +30,46 @@ export function TableSheet({ id }: { id: string }) {
     if (p) counts.set(groupKey(p), (counts.get(groupKey(p)) ?? 0) + 1);
   }
   const mainGroup = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+
+  const occupantName = (seat: number) => {
+    const g = bySeat.get(seat);
+    if (!g) return "ว่าง";
+    return guestLabel(g, g.party_id ? d.partyById.get(g.party_id) : undefined);
+  };
+  /** Move the occupant of seat `from` to seat `to`; seats in between shift by one. */
+  const reorder = (from: number, to: number) => {
+    setPickSeat(null);
+    if (from === to) return;
+    const slots: (string | null)[] = Array.from({ length: cap }, (_, i) => bySeat.get(i + 1)?.id ?? null);
+    const [moved] = slots.splice(from - 1, 1);
+    slots.splice(to - 1, 0, moved);
+    void setSeatOrder(id, slots, `${occupantName(from)} ที่ ${from} → ${to}`);
+  };
+  const SeatNo = ({ seat }: { seat: number }) => {
+    const filled = bySeat.has(seat);
+    const picked = pickSeat === seat;
+    return (
+      <button
+        disabled={busy || (!filled && pickSeat === null)}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (pickSeat === null) setPickSeat(seat);
+          else reorder(pickSeat, seat);
+        }}
+        className={`flex size-8 shrink-0 items-center justify-center rounded-full border text-sm tabular-nums ${
+          picked ? "border-accent bg-accent text-white" : filled ? "border-line bg-paper text-ink" : "border-transparent text-muted"
+        }`}
+        aria-label={`ที่นั่ง ${seat}`}
+      >
+        {seat}
+      </button>
+    );
+  };
+  /** While re-ordering, the whole row is a drop target. */
+  const DropCover = ({ seat }: { seat: number }) =>
+    pickSeat !== null && pickSeat !== seat ? (
+      <button className="absolute inset-0 z-10 bg-accent/5 active:bg-accent/15" onClick={() => reorder(pickSeat, seat)} aria-label={`ย้ายไปที่นั่ง ${seat}`} />
+    ) : null;
 
   return (
     <Sheet
@@ -107,25 +149,40 @@ export function TableSheet({ id }: { id: string }) {
         })}
       </div>
 
-      <div className="mb-1 text-xs font-medium text-muted">ที่นั่ง</div>
+      <div className="mb-1 flex items-center justify-between text-xs font-medium text-muted">
+        <span>ที่นั่ง</span>
+        <span className="font-normal">แตะเลขที่นั่งเพื่อเปลี่ยนลำดับ</span>
+      </div>
+      {pickSeat !== null && (
+        <div className="mb-2 flex items-center gap-2 rounded-xl bg-ink px-3 py-2 text-sm text-white">
+          <span className="min-w-0 flex-1">
+            ย้าย <b>{occupantName(pickSeat)}</b> (ที่ {pickSeat}) ไปที่นั่งไหน? แตะแถวปลายทาง
+          </span>
+          <button onClick={() => setPickSeat(null)} className="min-h-9 shrink-0 rounded-lg bg-white/15 px-3">
+            ยกเลิก
+          </button>
+        </div>
+      )}
       <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-card">
         {Array.from({ length: cap }, (_, i) => i + 1).map((seat) => {
           const g = bySeat.get(seat);
           if (!g)
             return (
-              <li key={seat} className="flex min-h-12 items-center gap-3 px-3 text-sm text-muted">
-                <span className="w-5 text-right tabular-nums">{seat}</span>
+              <li key={seat} className="relative flex min-h-12 items-center gap-3 px-2 text-sm text-muted">
+                <SeatNo seat={seat} />
                 <span>ว่าง</span>
+                <DropCover seat={seat} />
               </li>
             );
           if (g.kind === "reserved")
             return (
-              <li key={seat} className="flex min-h-12 items-center gap-3 px-3 text-sm">
-                <span className="w-5 text-right tabular-nums text-muted">{seat}</span>
+              <li key={seat} className="relative flex min-h-12 items-center gap-3 px-2 text-sm">
+                <SeatNo seat={seat} />
                 <span className="flex-1 rounded-lg border border-dashed border-muted/50 px-2 py-1 text-muted">{g.display_name || "จองไว้"}</span>
                 <button onClick={() => void unreserve(g.id)} className="min-h-10 px-2 text-xs text-accent">
                   ยกเลิก
                 </button>
+                <DropCover seat={seat} />
               </li>
             );
           const p = g.party_id ? d.partyById.get(g.party_id) : undefined;
@@ -151,12 +208,14 @@ export function TableSheet({ id }: { id: string }) {
               </li>
             );
           return (
-            <li key={seat} className={`flex items-stretch ${wrong ? "bg-danger/8" : ""}`}>
+            <li key={seat} className={`relative flex items-stretch ${wrong ? "bg-danger/8" : ""} ${pickSeat === seat ? "bg-accent-soft" : ""}`}>
+              <span className="flex items-center pl-2">
+                <SeatNo seat={seat} />
+              </span>
               <button
                 onClick={() => p && openSheet({ type: "party", id: p.id })}
-                className="flex min-h-12 min-w-0 flex-1 items-center gap-3 py-1.5 pl-3 text-left text-sm active:bg-paper"
+                className="flex min-h-12 min-w-0 flex-1 items-center gap-3 py-1.5 pl-2 text-left text-sm active:bg-paper"
               >
-                <span className="w-5 text-right tabular-nums text-muted">{seat}</span>
                 <StatusDot status={g.status} />
                 <span className="min-w-0 flex-1">
                   <span className={`block truncate ${wrong ? "font-semibold text-danger" : ""}`}>{guestLabel(g, p)}</span>
@@ -174,6 +233,7 @@ export function TableSheet({ id }: { id: string }) {
               >
                 เอาออก
               </button>
+              <DropCover seat={seat} />
             </li>
           );
         })}

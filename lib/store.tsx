@@ -110,6 +110,7 @@ interface Store {
   setTableSign: (tableId: string, signId: number | null) => Promise<void>;
   ackWarning: (tableId: string, signature: string | null) => Promise<void>;
   setChecked: (tableId: string, checked: boolean) => Promise<void>;
+  setSeatOrder: (tableId: string, order: (string | null)[], detail: string) => Promise<void>;
   addTable: (lane: Lane) => Promise<void>;
   deleteTable: (id: string) => Promise<void>;
   reserveSeat: (tableId: string) => Promise<void>;
@@ -359,6 +360,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           );
         }
         must(await db().from("parties").delete().eq("id", id));
+      });
+    },
+    setSeatOrder: async (tableId, order, detail) => {
+      await run("เปลี่ยนลำดับที่นั่ง", `${tableName(tableId)}: ${detail}`, async () => {
+        must(await db().rpc("set_seat_order", { p_table: tableId, p_order: order }));
       });
     },
     setChecked: async (tableId, checked) => {
