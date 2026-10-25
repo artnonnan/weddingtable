@@ -24,7 +24,7 @@ export function ListView() {
   const sections = useMemo(() => {
     if (!state || !d) return [];
     const key = searchKey(q);
-    const wrongGuests = new Set([...d.warnings.values()].flatMap((w) => [...w.wrongGuestIds]));
+    const wrongGuests = new Set([...d.warnings.values()].filter((w) => w.shown === "wrong").flatMap((w) => [...w.wrongGuestIds]));
     const keep = (p: Party) => {
       const ms = d.membersByParty.get(p.id) ?? [];
       if (key && !searchKey(`${p.name}${p.nickname}${p.village}${p.host}`).includes(key)) return false;

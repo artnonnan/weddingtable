@@ -67,7 +67,7 @@ function derive(s: DbState): Derived {
       free: s.tables.length * s.settings.seats_per_table - seated - reserved,
       reserved,
       unsure: people.filter((g) => g.status === "unsure").length,
-      warnTables: [...warnings.values()].filter((w) => w.level === "wrong").length,
+      warnTables: [...warnings.values()].filter((w) => w.shown === "wrong").length,
     },
     search: buildSearch(s.guests, partyById),
   };
@@ -105,6 +105,7 @@ interface Store {
   addParty: (draft: Pick<Party, "name" | "nickname" | "host" | "village" | "sign_id" | "note" | "size">) => Promise<string | null>;
   deleteParty: (id: string) => Promise<void>;
   setTableSign: (tableId: string, signId: number | null) => Promise<void>;
+  ackWarning: (tableId: string, signature: string | null) => Promise<void>;
   addTable: (lane: Lane) => Promise<void>;
   deleteTable: (id: string) => Promise<void>;
   reserveSeat: (tableId: string) => Promise<void>;
@@ -161,7 +162,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const [settings, signs, tables, parties, guests] = await Promise.all([
         c.from("settings").select("*").eq("id", 1).single(),
         c.from("signs").select("*").order("sort_order"),
-        c.from("tables").select("id,lane,pos,sign_id"),
+        c.from("tables").select("id,lane,pos,sign_id,warn_ack"),
         c.from("parties").select("*").order("created_at"),
         c.from("guests").select("id,kind,party_id,member_no,display_name,status,table_id,seat_no"),
       ]);
@@ -341,6 +342,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           );
         }
         must(await db().from("parties").delete().eq("id", id));
+      });
+    },
+    ackWarning: async (tableId, signature) => {
+      await run(signature ? "ซ่อนคำเตือนโต๊ะ" : "แสดงคำเตือนโต๊ะ", tableName(tableId), async () => {
+        must(await db().from("tables").update({ warn_ack: signature }).eq("id", tableId));
       });
     },
     setTableSign: async (tableId, signId) => {

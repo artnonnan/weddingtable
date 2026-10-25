@@ -37,6 +37,10 @@ export type WarnLevel = "none" | "mixed" | "wrong";
 
 export interface TableWarning {
   level: WarnLevel;
+  /** level to display: "none" when someone pressed "ไม่เป็นไร" for exactly this mix */
+  shown: WarnLevel;
+  /** identifies the current mix; stored in tables.warn_ack when acknowledged */
+  signature: string;
   /** guest ids whose party belongs to a different sign than the table */
   wrongGuestIds: Set<string>;
 }
@@ -46,6 +50,11 @@ export interface TableWarning {
  * mixed = everyone matches the sign but they come from different host/village groups (VIP exempt).
  */
 export function tableWarning(table: Table, occupants: Guest[], partyById: Map<string, Party>, signs: Sign[]): TableWarning {
+  const make = (level: WarnLevel): TableWarning => {
+    const signature = `${table.sign_id ?? "-"}|${[...signIds].sort().join(",")}|${[...groups].sort().join(",")}`;
+    const acked = level !== "none" && table.warn_ack === signature;
+    return { level, shown: acked ? "none" : level, signature, wrongGuestIds };
+  };
   const people = occupants.filter((g) => g.kind === "guest" && g.party_id);
   const wrongGuestIds = new Set<string>();
   const signIds = new Set<number | null>();
@@ -58,11 +67,11 @@ export function tableWarning(table: Table, occupants: Guest[], partyById: Map<st
     if (table.sign_id != null && p.sign_id !== table.sign_id) wrongGuestIds.add(g.id);
   }
   if (wrongGuestIds.size > 0 || (table.sign_id == null && signIds.size > 1)) {
-    return { level: "wrong", wrongGuestIds };
+    return make("wrong");
   }
   const isVip = signs.find((s) => s.id === table.sign_id)?.side === "vip";
-  if (!isVip && groups.size > 1) return { level: "mixed", wrongGuestIds };
-  return { level: "none", wrongGuestIds };
+  if (!isVip && groups.size > 1) return make("mixed");
+  return make("none");
 }
 
 // ---------------------------------------------------------------- auto-assign

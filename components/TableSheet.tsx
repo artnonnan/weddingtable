@@ -7,7 +7,7 @@ import { Sheet } from "./Sheet";
 import { Button, StatusDot, WarnBadge } from "./ui";
 
 export function TableSheet({ id }: { id: string }) {
-  const { state, d, closeSheet, openSheet, setTableSign, reserveSeat, unreserve, deleteTable, moveTo, busy } = useStore();
+  const { state, d, closeSheet, openSheet, setTableSign, reserveSeat, unreserve, deleteTable, moveTo, ackWarning, busy } = useStore();
   // guest whose "เอาออก" was tapped and whose party has several people here: ask whole group or just them
   const [askRemove, setAskRemove] = useState<string | null>(null);
   if (!state || !d) return null;
@@ -38,7 +38,7 @@ export function TableSheet({ id }: { id: string }) {
           <span className="text-sm font-normal text-muted">
             {people}/{cap} คน
           </span>
-          {warning && <WarnBadge level={warning.level} />}
+          {warning && <WarnBadge level={warning.shown} />}
         </span>
       }
       footer={
@@ -52,13 +52,33 @@ export function TableSheet({ id }: { id: string }) {
         </div>
       }
     >
-      {warning?.level === "wrong" && (
-        <div className="mb-3 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
-          ⚠️ มีคนที่ไม่ใช่กลุ่ม “{sign?.label ?? "-"}” นั่งโต๊ะนี้ (ไฮไลต์สีแดง)
+      {warning && warning.shown !== "none" && (
+        <div
+          className={`mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${
+            warning.shown === "wrong" ? "border-danger/30 bg-danger/5 text-danger" : "border-mixed/30 bg-mixed/5 text-mixed"
+          }`}
+        >
+          <span className="flex-1">
+            {warning.shown === "wrong"
+              ? `⚠️ มีคนที่ไม่ใช่กลุ่ม “${sign?.label ?? "-"}” นั่งโต๊ะนี้ (ไฮไลต์สีแดง)`
+              : "โต๊ะนี้มีหลายหมู่บ้านหรือหลายเจ้าภาพนั่งรวมกัน"}
+          </span>
+          <button
+            disabled={busy}
+            onClick={() => void ackWarning(id, warning.signature)}
+            className="min-h-9 shrink-0 rounded-lg border border-current/30 bg-card px-2.5 text-xs font-medium disabled:opacity-40"
+          >
+            ไม่เป็นไร ซ่อน
+          </button>
         </div>
       )}
-      {warning?.level === "mixed" && (
-        <div className="mb-3 rounded-xl border border-mixed/30 bg-mixed/5 px-3 py-2 text-sm text-mixed">โต๊ะนี้มีหลายหมู่บ้านหรือหลายเจ้าภาพนั่งรวมกัน</div>
+      {warning && warning.level !== "none" && warning.shown === "none" && (
+        <div className="mb-3 flex items-center gap-2 text-xs text-muted">
+          <span className="flex-1">ซ่อนคำเตือนโต๊ะนี้แล้ว (จะกลับมาถ้ามีกลุ่มอื่นย้ายเข้ามา)</span>
+          <button disabled={busy} onClick={() => void ackWarning(id, null)} className="min-h-9 px-1 font-medium text-accent">
+            แสดงอีกครั้ง
+          </button>
+        </div>
       )}
 
       <div className="mb-1 text-xs font-medium text-muted">ป้ายโต๊ะ</div>
@@ -100,8 +120,8 @@ export function TableSheet({ id }: { id: string }) {
               </li>
             );
           const p = g.party_id ? d.partyById.get(g.party_id) : undefined;
-          const wrong = warning?.wrongGuestIds.has(g.id);
-          const odd = !wrong && warning?.level === "mixed" && p && groupKey(p) !== mainGroup;
+          const wrong = warning?.shown === "wrong" && warning.wrongGuestIds.has(g.id);
+          const odd = !wrong && warning?.shown === "mixed" && p && groupKey(p) !== mainGroup;
           const pSign = p?.sign_id ? d.signById.get(p.sign_id) : undefined;
           const groupHere = occ.filter((x) => x.party_id && x.party_id === g.party_id);
           const removeOne = () => void moveTo(null, [g.id], guestLabel(g, p));

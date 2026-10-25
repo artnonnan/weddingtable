@@ -32,6 +32,8 @@ export interface Table {
   lane: Lane;
   pos: number;
   sign_id: number | null;
+  /** signature of an acknowledged mixed-group warning (see tableWarning) */
+  warn_ack?: string | null;
 }
 
 export interface Party {

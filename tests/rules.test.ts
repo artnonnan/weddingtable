@@ -114,4 +114,16 @@ describe("autoAssign", () => {
     expect(w.level).toBe("wrong");
     expect([...w.wrongGuestIds]).toEqual(["p2g1"]);
   });
+
+  it("hides an acknowledged warning until the mix changes", () => {
+    const { parties, guests } = fixture([["แม่ดาว", 3, "a", 2], ["แม่ดาว", 3, "b", 1], ["แม่ดาว", 3, "c", 1]]);
+    const byId = new Map(parties.map((p) => [p.id, p]));
+    const table: Table = { id: "t", lane: "bride", pos: 0, sign_id: 3 };
+    const first = tableWarning(table, guests.slice(0, 3), byId, SIGNS);
+    expect(first.shown).toBe("mixed");
+    const acked = { ...table, warn_ack: first.signature };
+    expect(tableWarning(acked, guests.slice(0, 3), byId, SIGNS).shown).toBe("none");
+    // a third village joins → warning is back
+    expect(tableWarning(acked, guests, byId, SIGNS).shown).toBe("mixed");
+  });
 });

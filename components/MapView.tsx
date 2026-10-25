@@ -79,7 +79,7 @@ function TableCard({ table, compact, highlight }: { table: Table; compact?: bool
   const people = occ.filter((g) => g.kind === "guest").length;
   const reserved = occ.length - people;
   const sign = table.sign_id ? d.signById.get(table.sign_id) : undefined;
-  const warn = d.warnings.get(table.id)?.level ?? "none";
+  const warn = d.warnings.get(table.id)?.shown ?? "none";
   const num = d.numbers.get(table.id);
   const free = cap - people;
   const canDrop = moving ? free >= moving.guestIds.length : false;
