@@ -179,11 +179,11 @@ export function PartySheet({ id }: { id: string }) {
                   ))}
                 </select>
                 <span className="flex-1" />
-                <button className="min-h-9 px-2 text-xs text-accent" onClick={() => startMove({ guestIds: [m.id], label: guestLabel(m, party) })}>
+                <button className="min-h-9 rounded-lg border border-accent/50 bg-card px-2.5 text-xs font-medium text-accent active:bg-accent-soft" onClick={() => startMove({ guestIds: [m.id], label: guestLabel(m, party) })}>
                   ย้ายคนนี้
                 </button>
                 {m.table_id && (
-                  <button className="min-h-9 px-2 text-xs text-muted" onClick={() => void moveTo(null, [m.id], guestLabel(m, party))}>
+                  <button className="min-h-9 rounded-lg border border-line bg-card px-2.5 text-xs font-medium text-ink active:bg-paper" onClick={() => void moveTo(null, [m.id], guestLabel(m, party))}>
                     เอาออกจากโต๊ะ
                   </button>
                 )}
@@ -193,15 +193,20 @@ export function PartySheet({ id }: { id: string }) {
         })}
       </ul>
 
-      <div className="mt-6 flex justify-between gap-2">
-        {members.some((m) => m.table_id) && (
-          <Button variant="ghost" onClick={() => void moveTo(null, members.map((m) => m.id), label)}>
-            เอาทั้งกลุ่มออกจากโต๊ะ
-          </Button>
-        )}
+      {members.some((m) => m.table_id) && (
+        <Button
+          className="mt-5 w-full border-2 border-accent! text-accent!"
+          disabled={busy}
+          onClick={() => void moveTo(null, members.map((m) => m.id), label)}
+        >
+          ↩ เอาทั้งกลุ่มออกจากโต๊ะ (ไป “รอดำเนินการ”)
+        </Button>
+      )}
+
+      {/* kept apart from the button above so it is not tapped by mistake */}
+      <div className="mt-10 flex justify-end border-t border-line pt-4">
         <Button
           variant="danger"
-          className="ml-auto"
           onClick={() => {
             if (confirm(`ลบ “${label}” (${party.size} คน) ออกจากรายชื่อ?`)) {
               void deleteParty(id).then(closeSheet);
