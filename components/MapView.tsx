@@ -9,10 +9,13 @@ import { WarnBadge } from "./ui";
 const LANE_TITLE: Record<Lane, string> = { bride: "ฝั่งเจ้าสาว", middle: "แถวกลาง", groom: "ฝั่งเจ้าบ่าว" };
 
 export function MapView({ highlight, compact }: { highlight?: string | null; compact?: boolean }) {
-  const { state, d } = useStore();
+  const { state, d, moving } = useStore();
   if (!state || !d) return null;
   const lanes = physicalLanes(state.settings.bride_side);
-  const rows = Math.max(0, ...state.tables.map((t) => t.pos + 1));
+  // "+ เพิ่มโต๊ะ" sits in the first empty cell after the end of each lane
+  const laneEnd = Object.fromEntries(lanes.map((l) => [l, Math.max(-1, ...state.tables.filter((t) => t.lane === l).map((t) => t.pos)) + 1]));
+  const showAdd = !compact && !moving;
+  const rows = Math.max(0, ...state.tables.map((t) => t.pos + 1), ...(showAdd ? lanes.map((l) => laneEnd[l] + 1) : []));
   const at = new Map(state.tables.map((t) => [`${t.lane}:${t.pos}`, t]));
 
   return (
@@ -34,15 +37,30 @@ export function MapView({ highlight, compact }: { highlight?: string | null; com
         {Array.from({ length: rows }, (_, pos) =>
           lanes.map((lane) => {
             const t = at.get(`${lane}:${pos}`);
-            return t ? (
-              <TableCard key={t.id} table={t} compact={compact} highlight={highlight === t.id} />
-            ) : (
-              <div key={`${lane}:${pos}`} />
-            );
+            if (t) return <TableCard key={t.id} table={t} compact={compact} highlight={highlight === t.id} />;
+            if (showAdd && pos === laneEnd[lane]) return <AddTableCell key={`add:${lane}`} lane={lane} />;
+            return <div key={`${lane}:${pos}`} />;
           }),
         )}
       </div>
     </div>
+  );
+}
+
+function AddTableCell({ lane }: { lane: Lane }) {
+  const { addTable, notify, busy } = useStore();
+  return (
+    <button
+      disabled={busy}
+      onClick={async () => {
+        await addTable(lane);
+        notify(`เพิ่มโต๊ะต่อท้าย${LANE_TITLE[lane]}แล้ว — แตะโต๊ะเพื่อเลือกป้าย`);
+      }}
+      className="flex min-h-[92px] flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-line text-muted active:bg-card disabled:opacity-40"
+    >
+      <span className="text-2xl leading-none">+</span>
+      <span className="text-xs">เพิ่มโต๊ะ</span>
+    </button>
   );
 }
 
@@ -96,7 +114,7 @@ function TableCard({ table, compact, highlight }: { table: Table; compact?: bool
         className="max-w-full truncate rounded-full px-1.5 text-[11px] font-medium leading-5 text-white"
         style={{ background: sign?.color ?? "#a8a29e" }}
       >
-        {sign?.label ?? "จองไว้/ว่าง"}
+        {sign?.label ?? "ไม่มีป้าย"}
       </span>
       <span className={`text-xs ${people > cap ? "font-bold text-danger" : people === cap ? "text-muted" : "font-semibold text-ink"}`}>
         {people}/{cap}
