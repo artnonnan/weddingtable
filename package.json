@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
-    "import": "tsx --env-file=.env.local scripts/import.ts"
+    "import": "tsx --experimental-websocket --env-file=.env.local scripts/import.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

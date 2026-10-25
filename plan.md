@@ -8,14 +8,18 @@
 
 ## ความคืบหน้า (25 ต.ค. 2569)
 
+**เว็บใช้งานได้แล้ว: https://weddingtable-flax.vercel.app** (push ขึ้น `main` แล้ว Vercel deploy ให้อัตโนมัติ)
+
 | ขั้น | สถานะ |
 |---|---|
 | 1. ตั้งโปรเจกต์ + git + push | ✅ |
-| 2. Schema + seed 7 ป้าย (`supabase/migrations/001_init.sql`) | ✅ เขียนแล้ว · ⏳ ยังไม่ได้รัน (รอ connection string) |
-| 3. สคริปต์ import (`npm run import`) + dry-run (`npx tsx scripts/dryrun.ts`) | ✅ dry-run: 169 รายการ / **263 คน**, ข้าม 10 รายการ (ไม่มา), จัดได้ **34 โต๊ะ** · ⏳ ยังไม่ได้เขียนลงฐานข้อมูล |
-| 4–8. หน้าผัง, จัดอัตโนมัติ, เตือนปนกลุ่ม, ย้ายแบบแตะ, ข้อมูลแขก, รายชื่อ, ค้นหา, realtime, change log, snapshot | ✅ เขียนแล้ว, build ผ่าน · ⏳ ยังไม่ได้ทดสอบกับฐานข้อมูลจริง |
-| 9. พิมพ์ป้ายโต๊ะ + ผังรวม (`/print/signs`, `/print/map`) | ✅ เขียนแล้ว |
-| 10. Deploy Vercel + ทดสอบบนมือถือ | ⏳ รอ Vercel token |
+| 2. Schema + seed 7 ป้าย (`npm run db:migrate`) | ✅ รันใน Supabase แล้ว |
+| 3. Import รายชื่อ (`npm run import -- --apply`) | ✅ 169 รายการ / **263 คน** (ข้าม 10 รายการที่ไม่มา) |
+| 4–8. ผัง, จัดอัตโนมัติ, เตือนปนกลุ่ม, ย้ายแบบแตะ, ข้อมูลแขก, รายชื่อ, ค้นหา, realtime, change log, snapshot | ✅ จัดแล้ว 34 โต๊ะ, ทดสอบบนจอมือถือ (ย้ายคน + realtime สองเครื่อง) ผ่าน |
+| 9. พิมพ์ป้ายโต๊ะ + ผังรวม (`/print/signs`, `/print/map`) | ✅ |
+| 10. Deploy Vercel | ✅ |
+
+**ดึงข้อมูลจากชีตใหม่**: สั่ง agent ให้อ่านชีตลง `data/sheet-raw.json` แล้วรัน `npm run import` (dry run) → `npm run import -- --apply` (เพิ่มเฉพาะคนใหม่ ไม่ทับที่นั่งเดิม)
 
 ---
 
