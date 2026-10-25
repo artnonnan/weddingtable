@@ -7,7 +7,7 @@ import { Sheet } from "./Sheet";
 import { Button, StatusDot, WarnBadge } from "./ui";
 
 export function TableSheet({ id }: { id: string }) {
-  const { state, d, closeSheet, openSheet, setTableSign, reserveSeat, unreserve, deleteTable, moveTo, ackWarning, startMove, busy } = useStore();
+  const { state, d, closeSheet, openSheet, setTableSign, reserveSeat, unreserve, deleteTable, moveTo, ackWarning, startMove, setChecked, busy } = useStore();
   // guest whose "เอาออก" was tapped and whose party has several people here: ask whole group or just them
   const [askRemove, setAskRemove] = useState<string | null>(null);
   if (!state || !d) return null;
@@ -39,6 +39,15 @@ export function TableSheet({ id }: { id: string }) {
             {people}/{cap} คน
           </span>
           {warning && <WarnBadge level={warning.shown} />}
+          <button
+            disabled={busy}
+            onClick={() => void setChecked(id, !table.checked_at)}
+            className={`ml-auto min-h-9 shrink-0 rounded-full border-2 px-3 text-sm font-medium disabled:opacity-40 ${
+              table.checked_at ? "border-ok bg-ok text-white" : "border-line bg-card text-muted"
+            }`}
+          >
+            {table.checked_at ? "✓ เช็คแล้ว" : "เช็คแล้ว?"}
+          </button>
         </span>
       }
       footer={

@@ -109,6 +109,7 @@ interface Store {
   deleteParty: (id: string) => Promise<void>;
   setTableSign: (tableId: string, signId: number | null) => Promise<void>;
   ackWarning: (tableId: string, signature: string | null) => Promise<void>;
+  setChecked: (tableId: string, checked: boolean) => Promise<void>;
   addTable: (lane: Lane) => Promise<void>;
   deleteTable: (id: string) => Promise<void>;
   reserveSeat: (tableId: string) => Promise<void>;
@@ -165,7 +166,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const [settings, signs, tables, parties, guests] = await Promise.all([
         c.from("settings").select("*").eq("id", 1).single(),
         c.from("signs").select("*").order("sort_order"),
-        c.from("tables").select("id,lane,pos,sign_id,warn_ack"),
+        c.from("tables").select("id,lane,pos,sign_id,warn_ack,checked_at,checked_by"),
         c.from("parties").select("*").order("created_at"),
         c.from("guests").select("id,kind,party_id,member_no,display_name,status,table_id,seat_no"),
       ]);
@@ -358,6 +359,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           );
         }
         must(await db().from("parties").delete().eq("id", id));
+      });
+    },
+    setChecked: async (tableId, checked) => {
+      await run(checked ? "เช็คโต๊ะแล้ว" : "ยกเลิกเช็คโต๊ะ", tableName(tableId), async () => {
+        const patch = checked ? { checked_at: new Date().toISOString(), checked_by: actor } : { checked_at: null, checked_by: null };
+        must(await db().from("tables").update(patch).eq("id", tableId));
       });
     },
     ackWarning: async (tableId, signature) => {

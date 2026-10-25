@@ -34,6 +34,9 @@ export interface Table {
   sign_id: number | null;
   /** signature of an acknowledged mixed-group warning (see tableWarning) */
   warn_ack?: string | null;
+  /** set when someone marked the table "เช็คแล้ว" */
+  checked_at?: string | null;
+  checked_by?: string | null;
 }
 
 export interface Party {

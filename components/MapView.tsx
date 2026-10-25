@@ -23,6 +23,11 @@ export function MapView({ highlight, compact }: { highlight?: string | null; com
       <div className={`mx-auto mb-3 rounded-xl bg-accent text-center font-semibold tracking-widest text-white ${compact ? "py-1 text-xs" : "py-2.5 text-sm"}`}>
         เวที
       </div>
+      {!compact && state.tables.length > 0 && (
+        <div className="mb-2 text-center text-xs text-muted">
+          เช็คแล้ว <b className="text-ok">{state.tables.filter((t) => t.checked_at).length}</b> / {state.tables.length} โต๊ะ
+        </div>
+      )}
       {!compact && (
         <div className="mb-1 grid grid-cols-3 gap-2 text-center text-[11px] font-medium text-muted">
           {lanes.map((l) => (
@@ -114,11 +119,24 @@ function TableCard({ table, compact, highlight }: { table: Table; compact?: bool
       className={`relative flex min-h-[92px] flex-col items-center justify-center gap-1 rounded-2xl border-2 bg-card px-1 py-2 text-center shadow-sm active:scale-[0.97] ${
         focused || highlight ? "flash" : ""
       } ${moving && !canDrop ? "opacity-35" : ""} ${moving && canDrop ? "ring-2 ring-accent/50" : ""}`}
-      style={{ borderColor: border, background: warn === "wrong" ? "color-mix(in srgb, var(--color-danger) 7%, white)" : undefined }}
+      style={{
+        borderColor: border,
+        background:
+          warn === "wrong"
+            ? "color-mix(in srgb, var(--color-danger) 7%, white)"
+            : table.checked_at
+              ? "color-mix(in srgb, var(--color-ok) 9%, white)"
+              : undefined,
+      }}
     >
       <span className="absolute right-1.5 top-1.5">
         <WarnBadge level={warn} />
       </span>
+      {table.checked_at && (
+        <span className="absolute left-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-ok text-[11px] font-bold text-white" title="เช็คแล้ว">
+          ✓
+        </span>
+      )}
       <span className="text-xl font-bold leading-none">{num}</span>
       <span
         className="max-w-full truncate rounded-full px-1.5 text-[11px] font-medium leading-5 text-white"
