@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_Thai } from "next/font/google";
 import { StoreProvider } from "@/lib/store";
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="th" className={thai.variable}>
       <body className="font-sans antialiased">
         <StoreProvider>{children}</StoreProvider>
+        <Analytics />
       </body>
     </html>
   );
