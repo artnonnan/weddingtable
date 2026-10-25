@@ -18,20 +18,19 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function MoreView() {
-  const { state, actor, setActor, updateSettings, addTable, runAutoAssign, busy } = useStore();
-  const [name, setName] = useState(actor);
-  useEffect(() => setName(actor), [actor]);
+  const { state, editor, logout, updateSettings, addTable, runAutoAssign, busy } = useStore();
   if (!state) return null;
   const s = state.settings;
 
   return (
     <div className="px-3 pb-6">
-      <Card title="ชื่อของคุณ (ไว้บันทึกประวัติการแก้ไข)">
-        <div className="flex gap-2">
-          <input className={inputClass} placeholder="เช่น อาท, โดม, พี่หน้างาน" value={name} onChange={(e) => setName(e.target.value)} />
-          <Button onClick={() => setActor(name.trim())} disabled={name.trim() === actor}>
-            บันทึก
-          </Button>
+      <Card title="โหมดแก้ไข">
+        <div className="flex items-center gap-2">
+          <span className="flex-1 text-sm">
+            กำลังแก้ไขในชื่อ <b>{editor}</b>
+            <span className="block text-xs text-muted">ชื่อนี้จะขึ้นในประวัติการแก้ไขและแจ้งเตือน</span>
+          </span>
+          <Button onClick={() => void logout()}>ออกจากโหมดแก้ไข</Button>
         </div>
       </Card>
 

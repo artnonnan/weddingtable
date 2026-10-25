@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { autoAssign, partyLabel, tableNumbers, tableWarning, type TableWarning } from "./layout";
 import { buildSearch, type SearchHit } from "./search";
-import { db, must } from "./supabase";
+import { db, must, setEditToken } from "./supabase";
 import { STATUS_LABEL, type ChangeLogEntry, type DbState, type Guest, type GuestStatus, type Lane, type Party, type Settings, type Sign, type SnapshotMeta, type Table } from "./types";
 
 // ---------------------------------------------------------------- UI state
@@ -96,8 +96,12 @@ interface Store {
   goToTable: (id: string) => void;
   toast: string | null;
   notify: (msg: string) => void;
+  /** name of the signed-in editor; null = view-only */
+  editor: string | null;
+  canEdit: boolean;
   actor: string;
-  setActor: (name: string) => void;
+  login: (pin: string, name: string) => Promise<string | null>;
+  logout: () => Promise<void>;
   // data actions
   moveTo: (tableId: string | null, guestIds?: string[], label?: string) => Promise<boolean>;
   moveTable: (fromId: string, toId: string) => Promise<boolean>;
@@ -132,11 +136,14 @@ export function useStore(): Store {
   return s;
 }
 
-function readActor(): string {
+const TOKEN_KEY = "editToken";
+
+function storeToken(token: string | null) {
   try {
-    return localStorage.getItem("actor") ?? "";
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
   } catch {
-    return "";
+    /* private mode: edit mode lasts until the tab closes */
   }
 }
 
@@ -149,11 +156,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [moving, setMoving] = useState<Moving | null>(null);
   const [focusTable, setFocusTable] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [actor, setActorState] = useState("");
+  const [editor, setEditor] = useState<string | null>(null);
+  const actor = editor ?? "";
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSnapshotAt = useRef<number | null>(null);
 
-  useEffect(() => setActorState(readActor()), []);
+  const dropEditor = useCallback(() => {
+    setEditToken(null);
+    storeToken(null);
+    setEditor(null);
+  }, []);
+
+  // restore edit mode on this device if its token is still valid
+  useEffect(() => {
+    let token: string | null = null;
+    try {
+      token = localStorage.getItem(TOKEN_KEY);
+    } catch {
+      /* ignore */
+    }
+    if (!token) return;
+    setEditToken(token);
+    db()
+      .rpc("check_edit_session")
+      .then(({ data }) => (typeof data === "string" && data ? setEditor(data) : dropEditor()));
+  }, [dropEditor]);
+
+  // view-only devices have no "เพิ่มเติม" tab
+  useEffect(() => {
+    if (!editor && tab === "more") setTab("map");
+  }, [editor, tab]);
 
   const notify = useCallback((msg: string) => {
     setToast(msg);
@@ -228,9 +260,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [actor],
   );
 
+  /** The database ignores writes without a valid token, so check first and say why. */
+  const ensureEditor = useCallback(async (): Promise<boolean> => {
+    if (!editor) {
+      notify("โหมดดูอย่างเดียว — กด 🔒 เพื่อกรอก PIN");
+      return false;
+    }
+    const { data } = await db().rpc("check_edit_session");
+    if (typeof data === "string" && data) return true;
+    dropEditor();
+    notify("สิทธิ์แก้ไขหมดแล้ว (PIN อาจถูกเปลี่ยน) กรุณากรอก PIN ใหม่");
+    return false;
+  }, [editor, notify, dropEditor]);
+
   /** Run a mutation, log it, refresh. Returns false (and toasts) on failure. */
   const run = useCallback(
     async (action: string, detail: string, fn: () => Promise<void>): Promise<boolean> => {
+      if (!(await ensureEditor())) return false;
       setBusy(true);
       try {
         await fn();
@@ -245,7 +291,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setBusy(false);
       }
     },
-    [log, notify, refresh],
+    [ensureEditor, log, notify, refresh],
   );
 
   const tableName = useCallback((id: string | null) => (id && d ? `โต๊ะ ${d.numbers.get(id) ?? "?"}` : "รอดำเนินการ"), [d]);
@@ -280,14 +326,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     toast,
     notify,
+    editor,
+    canEdit: editor !== null,
     actor,
-    setActor: (name) => {
-      setActorState(name);
-      try {
-        localStorage.setItem("actor", name);
-      } catch {
-        /* private mode */
-      }
+    login: async (pin, name) => {
+      const { data, error } = await db().rpc("login_edit", { p_pin: pin, p_name: name });
+      if (error) return error.message;
+      const res = data as { ok: boolean; token?: string; name?: string; error?: string };
+      if (!res.ok || !res.token) return res.error ?? "เข้าโหมดแก้ไขไม่สำเร็จ";
+      setEditToken(res.token);
+      storeToken(res.token);
+      setEditor(res.name ?? name);
+      notify(`เข้าโหมดแก้ไขแล้ว (${res.name ?? name})`);
+      return null;
+    },
+    logout: async () => {
+      await db().rpc("logout_edit");
+      dropEditor();
+      setMoving(null);
+      setSheets([]);
+      notify("ออกจากโหมดแก้ไขแล้ว");
     },
 
     moveTo: async (tableId, guestIds, label) => {
@@ -421,7 +479,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
     },
     runAutoAssign: async () => {
-      if (!state) return;
+      if (!state || !(await ensureEditor())) return;
       const res = autoAssign({ settings: state.settings, signs: state.signs, parties: state.parties, guests: state.guests });
       setBusy(true);
       try {
@@ -436,6 +494,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     },
     createSnapshot: async (reason) => {
+      if (!(await ensureEditor())) return;
       try {
         must(await db().rpc("create_snapshot", { p_reason: reason, p_actor: actor }));
         lastSnapshotAt.current = Date.now();
@@ -445,6 +504,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     },
     restoreSnapshot: async (id) => {
+      if (!(await ensureEditor())) return;
       setBusy(true);
       try {
         must(await db().rpc("restore_snapshot", { p_id: id, p_actor: actor }));

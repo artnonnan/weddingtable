@@ -17,7 +17,7 @@ const FILTERS: [Filter, string][] = [
 ];
 
 export function ListView() {
-  const { state, d, openSheet } = useStore();
+  const { state, d, openSheet, canEdit } = useStore();
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
 
@@ -114,7 +114,7 @@ export function ListView() {
           ))}
         </section>
       ))}
-      <AddPartyButton />
+      {canEdit && <AddPartyButton />}
     </div>
   );
 }

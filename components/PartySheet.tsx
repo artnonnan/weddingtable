@@ -21,7 +21,7 @@ const toForm = (p: Party): Form => ({
 
 /** Record info for one sheet row (party): edit in the web only, never written back to Google Sheets. */
 export function PartySheet({ id }: { id: string }) {
-  const { state, d, closeSheet, updateParty, setPartySize, setPartyStatus, updateGuest, startMove, moveTo, deleteParty, goToTable, busy } = useStore();
+  const { state, d, closeSheet, updateParty, setPartySize, setPartyStatus, updateGuest, startMove, moveTo, deleteParty, goToTable, canEdit, busy } = useStore();
   const party = d?.partyById.get(id);
   const [form, setForm] = useState<Form | null>(party ? toForm(party) : null);
   const [names, setNames] = useState<Record<string, string>>({});
@@ -54,12 +54,14 @@ export function PartySheet({ id }: { id: string }) {
       onClose={closeSheet}
       title={<span className="block truncate">{label}</span>}
       footer={
+        canEdit && (
         <div className="flex gap-2">
           <Button className="flex-1" variant="primary" disabled={!dirty || busy || form.size < 1} onClick={() => void save()}>
             บันทึก
           </Button>
           <Button onClick={() => startMove({ guestIds: members.map((m) => m.id), label: `${label} (${members.length} คน)` })}>ย้ายทั้งกลุ่ม</Button>
         </div>
+        )
       }
     >
       <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
@@ -77,6 +79,8 @@ export function PartySheet({ id }: { id: string }) {
         {party.source_sheet && <span className="text-xs text-muted">จากชีต “{party.source_sheet}” แถว {party.source_row}</span>}
       </div>
 
+      {/* view-only devices see the same record, every control disabled */}
+      <fieldset disabled={!canEdit} className="min-w-0">
       <div className="space-y-3">
         <Field label="ชื่อจริง">
           <input className={inputClass} value={form.name} onChange={(e) => set("name", e.target.value)} />
@@ -140,6 +144,7 @@ export function PartySheet({ id }: { id: string }) {
           </Button>
         ))}
       </div>
+      </fieldset>
 
       <div className="mb-1 mt-5 text-xs font-medium text-muted">รายคน ({members.length})</div>
       <ul className="divide-y divide-line rounded-xl border border-line bg-card">
@@ -149,6 +154,7 @@ export function PartySheet({ id }: { id: string }) {
             <li key={m.id} className="space-y-2 px-3 py-2.5">
               <div className="flex items-center gap-2">
                 <input
+                  disabled={!canEdit}
                   className={`${inputClass} min-h-10 flex-1 text-sm`}
                   placeholder={guestLabel({ ...m, display_name: null }, party)}
                   value={value}
@@ -168,6 +174,7 @@ export function PartySheet({ id }: { id: string }) {
               </div>
               <div className="flex items-center gap-1.5">
                 <select
+                  disabled={!canEdit}
                   className="min-h-9 rounded-lg border border-line bg-card px-2 text-xs"
                   value={m.status}
                   onChange={(e) => void updateGuest(m.id, { status: e.target.value as GuestStatus })}
@@ -179,10 +186,12 @@ export function PartySheet({ id }: { id: string }) {
                   ))}
                 </select>
                 <span className="flex-1" />
+                {canEdit && (
                 <button className="min-h-9 rounded-lg border border-accent/50 bg-card px-2.5 text-xs font-medium text-accent active:bg-accent-soft" onClick={() => startMove({ guestIds: [m.id], label: guestLabel(m, party) })}>
                   ย้ายคนนี้
                 </button>
-                {m.table_id && (
+                )}
+                {canEdit && m.table_id && (
                   <button className="min-h-9 rounded-lg border border-line bg-card px-2.5 text-xs font-medium text-ink active:bg-paper" onClick={() => void moveTo(null, [m.id], guestLabel(m, party))}>
                     เอาออกจากโต๊ะ
                   </button>
@@ -193,7 +202,7 @@ export function PartySheet({ id }: { id: string }) {
         })}
       </ul>
 
-      {members.some((m) => m.table_id) && (
+      {canEdit && members.some((m) => m.table_id) && (
         <Button
           className="mt-5 w-full border-2 border-accent! text-accent!"
           disabled={busy}
@@ -204,6 +213,7 @@ export function PartySheet({ id }: { id: string }) {
       )}
 
       {/* kept apart from the button above so it is not tapped by mistake */}
+      {canEdit && (
       <div className="mt-10 flex justify-end border-t border-line pt-4">
         <Button
           variant="danger"
@@ -216,6 +226,7 @@ export function PartySheet({ id }: { id: string }) {
           ลบรายชื่อ
         </Button>
       </div>
+      )}
     </Sheet>
   );
 }

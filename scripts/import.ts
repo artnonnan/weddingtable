@@ -19,7 +19,23 @@ const file = process.argv.slice(2).find((a) => !a.startsWith("--")) ?? "data/she
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 if (!url || !key) throw new Error("NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY missing in .env.local");
-const db = createClient(url, key, { auth: { persistSession: false } });
+// writes need an edit session (migration 010): sign in with the PIN and send the token header
+let editToken: string | null = null;
+const db = createClient(url, key, {
+  auth: { persistSession: false },
+  global: {
+    fetch: (input, init) => {
+      const headers = new Headers(init?.headers);
+      if (editToken) headers.set("x-edit-token", editToken);
+      return fetch(input, { ...init, headers });
+    },
+  },
+});
+if (process.env.EDIT_PIN) {
+  const res = must(await db.rpc("login_edit", { p_pin: process.env.EDIT_PIN, p_name: "import" })) as { ok: boolean; token?: string; error?: string };
+  if (!res.ok) throw new Error(`PIN: ${res.error}`);
+  editToken = res.token ?? null;
+}
 
 function must<T>(res: { data: T | null; error: { message: string } | null }): T {
   if (res.error) throw new Error(res.error.message);

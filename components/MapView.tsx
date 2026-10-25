@@ -9,12 +9,12 @@ import { WarnBadge } from "./ui";
 const LANE_TITLE: Record<Lane, string> = { bride: "ฝั่งเจ้าสาว", middle: "แถวกลาง", groom: "ฝั่งเจ้าบ่าว" };
 
 export function MapView({ highlight, compact }: { highlight?: string | null; compact?: boolean }) {
-  const { state, d, moving } = useStore();
+  const { state, d, moving, canEdit } = useStore();
   if (!state || !d) return null;
   const lanes = physicalLanes(state.settings.bride_side);
   // "+ เพิ่มโต๊ะ" sits in the first empty cell after the end of each lane
   const laneEnd = Object.fromEntries(lanes.map((l) => [l, Math.max(-1, ...state.tables.filter((t) => t.lane === l).map((t) => t.pos)) + 1]));
-  const showAdd = !compact && !moving;
+  const showAdd = canEdit && !compact && !moving;
   const rows = Math.max(0, ...state.tables.map((t) => t.pos + 1), ...(showAdd ? lanes.map((l) => laneEnd[l] + 1) : []));
   const at = new Map(state.tables.map((t) => [`${t.lane}:${t.pos}`, t]));
 
@@ -36,7 +36,7 @@ export function MapView({ highlight, compact }: { highlight?: string | null; com
         </div>
       )}
       {rows === 0 && !compact && (
-        <p className="py-10 text-center text-sm text-muted">ยังไม่มีโต๊ะ — ไปที่แท็บ “เพิ่มเติม” แล้วกด “จัดอัตโนมัติ”</p>
+        <p className="py-10 text-center text-sm text-muted">ยังไม่มีโต๊ะ</p>
       )}
       <div className={`grid grid-cols-3 ${compact ? "gap-1" : "gap-2"}`}>
         {Array.from({ length: rows }, (_, pos) =>

@@ -7,7 +7,7 @@ import { SignChip, StatusDot } from "./ui";
 
 /** "รอดำเนินการ": everyone without a table, ready to be placed. */
 export function PendingSheet() {
-  const { state, d, closeSheet, openSheet, startMove } = useStore();
+  const { state, d, closeSheet, openSheet, startMove, canEdit } = useStore();
   if (!state || !d) return null;
 
   const rows = state.parties
@@ -22,7 +22,7 @@ export function PendingSheet() {
         <p className="py-8 text-center text-sm text-muted">ทุกคนมีโต๊ะแล้ว 🎉</p>
       ) : (
         <>
-          <p className="mb-3 text-xs text-muted">กด “เลือกโต๊ะ” แล้วแตะโต๊ะปลายทางบนผัง</p>
+          {canEdit && <p className="mb-3 text-xs text-muted">กด “เลือกโต๊ะ” แล้วแตะโต๊ะปลายทางบนผัง</p>}
           <ul className="divide-y divide-line rounded-xl border border-line bg-card">
             {rows.map(({ p, free }) => (
               <li key={p.id} className="flex items-center gap-2 px-3 py-2">
@@ -38,12 +38,14 @@ export function PendingSheet() {
                     </span>
                   </span>
                 </button>
+                {canEdit && (
                 <button
                   className="min-h-10 shrink-0 rounded-xl bg-accent px-3 text-sm font-medium text-white active:opacity-80"
                   onClick={() => startMove({ guestIds: free.map((m) => m.id), label: `${partyLabel(p)} (${free.length} คน)` })}
                 >
                   เลือกโต๊ะ
                 </button>
+                )}
               </li>
             ))}
           </ul>

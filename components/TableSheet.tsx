@@ -7,7 +7,7 @@ import { Sheet } from "./Sheet";
 import { Button, StatusDot, WarnBadge } from "./ui";
 
 export function TableSheet({ id }: { id: string }) {
-  const { state, d, closeSheet, openSheet, setTableSign, reserveSeat, unreserve, deleteTable, moveTo, ackWarning, startMove, setChecked, setSeatOrder, busy } = useStore();
+  const { state, d, closeSheet, openSheet, setTableSign, reserveSeat, unreserve, deleteTable, moveTo, ackWarning, startMove, setChecked, setSeatOrder, canEdit, busy } = useStore();
   // guest whose "เอาออก" was tapped and whose party has several people here: ask whole group or just them
   const [askRemove, setAskRemove] = useState<string | null>(null);
   // seat number tapped first when re-ordering; the next seat tapped is where that person goes
@@ -50,7 +50,7 @@ export function TableSheet({ id }: { id: string }) {
     const picked = pickSeat === seat;
     return (
       <button
-        disabled={busy || (!filled && pickSeat === null)}
+        disabled={!canEdit || busy || (!filled && pickSeat === null)}
         onClick={(e) => {
           e.stopPropagation();
           if (pickSeat === null) setPickSeat(seat);
@@ -81,6 +81,7 @@ export function TableSheet({ id }: { id: string }) {
             {people}/{cap} คน
           </span>
           {warning && <WarnBadge level={warning.shown} />}
+          {canEdit ? (
           <button
             disabled={busy}
             onClick={() => void setChecked(id, !table.checked_at)}
@@ -90,9 +91,13 @@ export function TableSheet({ id }: { id: string }) {
           >
             {table.checked_at ? "✓ เช็คแล้ว" : "เช็คแล้ว?"}
           </button>
+          ) : (
+            table.checked_at && <span className="ml-auto rounded-full bg-ok px-3 py-1 text-sm font-medium text-white">✓ เช็คแล้ว</span>
+          )}
         </span>
       }
       footer={
+        canEdit && (
         <div className="flex gap-2">
           <Button className="flex-1" onClick={() => openSheet({ type: "pick", tableId: id })} disabled={people >= cap}>
             + เพิ่มคนลงโต๊ะ
@@ -101,6 +106,7 @@ export function TableSheet({ id }: { id: string }) {
             จองที่
           </Button>
         </div>
+        )
       }
     >
       {warning && warning.shown !== "none" && (
@@ -114,6 +120,7 @@ export function TableSheet({ id }: { id: string }) {
               ? `⚠️ มีคนที่ไม่ใช่กลุ่ม “${sign?.label ?? "-"}” นั่งโต๊ะนี้ (ไฮไลต์สีแดง)`
               : "โต๊ะนี้มีหลายหมู่บ้านหรือหลายเจ้าภาพนั่งรวมกัน"}
           </span>
+          {canEdit && (
           <button
             disabled={busy}
             onClick={() => void ackWarning(id, warning.signature)}
@@ -121,9 +128,10 @@ export function TableSheet({ id }: { id: string }) {
           >
             ไม่เป็นไร ซ่อน
           </button>
+          )}
         </div>
       )}
-      {warning && warning.level !== "none" && warning.shown === "none" && (
+      {canEdit && warning && warning.level !== "none" && warning.shown === "none" && (
         <div className="mb-3 flex items-center gap-2 text-xs text-muted">
           <span className="flex-1">ซ่อนคำเตือนโต๊ะนี้แล้ว (จะกลับมาถ้ามีกลุ่มอื่นย้ายเข้ามา)</span>
           <button disabled={busy} onClick={() => void ackWarning(id, null)} className="min-h-9 px-1 font-medium text-accent">
@@ -134,11 +142,12 @@ export function TableSheet({ id }: { id: string }) {
 
       <div className="mb-1 text-xs font-medium text-muted">ป้ายโต๊ะ</div>
       <div className="-mx-1 mb-4 flex flex-wrap gap-1.5">
-        {state.signs.map((s) => {
+        {state.signs.filter((s) => canEdit || s.id === table.sign_id).map((s) => {
           const active = s.id === table.sign_id;
           return (
             <button
               key={s.id}
+              disabled={!canEdit}
               onClick={() => void setTableSign(id, active ? null : s.id)}
               className={`min-h-9 rounded-full border-2 px-3 text-sm font-medium ${active ? "text-white" : "bg-card"}`}
               style={{ borderColor: s.color, background: active ? s.color : undefined, color: active ? "#fff" : s.color }}
@@ -151,7 +160,7 @@ export function TableSheet({ id }: { id: string }) {
 
       <div className="mb-1 flex items-center justify-between text-xs font-medium text-muted">
         <span>ที่นั่ง</span>
-        <span className="font-normal">แตะเลขที่นั่งเพื่อเปลี่ยนลำดับ</span>
+        {canEdit && <span className="font-normal">แตะเลขที่นั่งเพื่อเปลี่ยนลำดับ</span>}
       </div>
       {pickSeat !== null && (
         <div className="mb-2 flex items-center gap-2 rounded-xl bg-ink px-3 py-2 text-sm text-white">
@@ -179,9 +188,11 @@ export function TableSheet({ id }: { id: string }) {
               <li key={seat} className="relative flex min-h-12 items-center gap-3 px-2 text-sm">
                 <SeatNo seat={seat} />
                 <span className="flex-1 rounded-lg border border-dashed border-muted/50 px-2 py-1 text-muted">{g.display_name || "จองไว้"}</span>
-                <button onClick={() => void unreserve(g.id)} className="min-h-10 px-2 text-xs text-accent">
-                  ยกเลิก
-                </button>
+                {canEdit && (
+                  <button onClick={() => void unreserve(g.id)} className="min-h-10 px-2 text-xs text-accent">
+                    ยกเลิก
+                  </button>
+                )}
                 <DropCover seat={seat} />
               </li>
             );
@@ -226,19 +237,23 @@ export function TableSheet({ id }: { id: string }) {
                   </span>
                 </span>
               </button>
-              <button
-                disabled={busy}
-                onClick={() => (groupHere.length > 1 ? setAskRemove(g.id) : removeOne())}
-                className="shrink-0 px-3 text-xs font-medium text-accent active:bg-accent-soft disabled:opacity-40"
-              >
-                เอาออก
-              </button>
+              {canEdit && (
+                <button
+                  disabled={busy}
+                  onClick={() => (groupHere.length > 1 ? setAskRemove(g.id) : removeOne())}
+                  className="shrink-0 px-3 text-xs font-medium text-accent active:bg-accent-soft disabled:opacity-40"
+                >
+                  เอาออก
+                </button>
+              )}
               <DropCover seat={seat} />
             </li>
           );
         })}
       </ul>
 
+      {canEdit && (
+        <>
       <Button
         className="mt-5 w-full border-2 border-accent! text-accent!"
         disabled={busy || occ.length === 0}
@@ -257,6 +272,8 @@ export function TableSheet({ id }: { id: string }) {
           ลบโต๊ะนี้
         </Button>
       </div>
+        </>
+      )}
     </Sheet>
   );
 }

@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { ListView } from "@/components/ListView";
 import { MapView } from "@/components/MapView";
 import { MoreView } from "@/components/MoreView";
 import { PartySheet } from "@/components/PartySheet";
 import { PendingSheet } from "@/components/PendingSheet";
+import { PinSheet } from "@/components/PinSheet";
 import { PickSheet } from "@/components/PickSheet";
 import { SearchView } from "@/components/SearchView";
 import { TableSheet } from "@/components/TableSheet";
@@ -18,14 +20,26 @@ const TABS: [Tab, string, string][] = [
 ];
 
 export default function Home() {
-  const { state, d, error, tab, setTab, sheets, openSheet, moving, cancelMove, toast } = useStore();
+  const { state, d, error, tab, setTab, sheets, openSheet, moving, cancelMove, toast, editor, canEdit } = useStore();
+  const [pinOpen, setPinOpen] = useState(false);
+  const tabs = canEdit ? TABS : TABS.filter(([t]) => t !== "more");
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col">
       <header className="sticky top-0 z-20 border-b border-line bg-paper/95 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur">
-        <div className="flex items-baseline justify-between">
-          <h1 className="text-base font-bold text-accent">ผังโต๊ะ อาท & โดม</h1>
-          <span className="text-xs text-muted">14 พ.ย.</span>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-base font-bold text-accent">
+            ผังโต๊ะ อาท & โดม <span className="text-xs font-normal text-muted">14 พ.ย.</span>
+          </h1>
+          {canEdit ? (
+            <button onClick={() => setTab("more")} className="min-h-8 max-w-[45%] truncate rounded-full bg-accent-soft px-3 text-xs font-medium text-accent">
+              ✏️ {editor}
+            </button>
+          ) : (
+            <button onClick={() => setPinOpen(true)} className="min-h-8 shrink-0 rounded-full border border-line bg-card px-3 text-xs font-medium text-muted">
+              🔒 ดูอย่างเดียว · แก้ไข
+            </button>
+          )}
         </div>
         {d && (
           <div className="mt-1.5 grid grid-cols-5 gap-1 text-center">
@@ -76,8 +90,8 @@ export default function Home() {
       </main>
 
       <nav className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <div className="mx-auto grid max-w-xl grid-cols-4">
-          {TABS.map(([t, label, icon]) => (
+        <div className={`mx-auto grid max-w-xl ${canEdit ? "grid-cols-4" : "grid-cols-3"}`}>
+          {tabs.map(([t, label, icon]) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -98,6 +112,8 @@ export default function Home() {
           {s.type === "pending" && <PendingSheet />}
         </div>
       ))}
+
+      {pinOpen && <PinSheet onClose={() => setPinOpen(false)} />}
 
       {toast && (
         <div className="pointer-events-none fixed inset-x-0 top-24 z-50 flex justify-center px-4">
