@@ -4,6 +4,7 @@ import { ListView } from "@/components/ListView";
 import { MapView } from "@/components/MapView";
 import { MoreView } from "@/components/MoreView";
 import { PartySheet } from "@/components/PartySheet";
+import { PendingSheet } from "@/components/PendingSheet";
 import { PickSheet } from "@/components/PickSheet";
 import { SearchView } from "@/components/SearchView";
 import { TableSheet } from "@/components/TableSheet";
@@ -17,7 +18,7 @@ const TABS: [Tab, string, string][] = [
 ];
 
 export default function Home() {
-  const { state, d, error, tab, setTab, sheets, moving, cancelMove, toast } = useStore();
+  const { state, d, error, tab, setTab, sheets, openSheet, moving, cancelMove, toast } = useStore();
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col">
@@ -30,7 +31,7 @@ export default function Home() {
           <div className="mt-1.5 grid grid-cols-5 gap-1 text-center">
             <Stat label="แขก" value={d.stats.people} />
             <Stat label="มีโต๊ะ" value={d.stats.seated} />
-            <Stat label="ไม่มีโต๊ะ" value={d.stats.unseated} tone={d.stats.unseated ? "warn" : undefined} onClick={() => setTab("list")} />
+            <Stat label="รอดำเนินการ" value={d.stats.unseated} tone={d.stats.unseated ? "warn" : undefined} onClick={() => openSheet({ type: "pending" })} />
             <Stat label="ที่ว่าง" value={d.stats.free} />
             <Stat label="ผิดกลุ่ม" value={d.stats.warnTables} tone={d.stats.warnTables ? "danger" : undefined} />
           </div>
@@ -55,6 +56,18 @@ export default function Home() {
           </div>
         )}
         {!state && !error && <p className="py-20 text-center text-sm text-muted">กำลังโหลด…</p>}
+        {state && tab === "map" && d && d.stats.unseated > 0 && !moving && (
+          <button
+            onClick={() => openSheet({ type: "pending" })}
+            className="mx-3 mb-3 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-xl border border-unsure/40 bg-unsure/10 px-3 py-2.5 text-left text-sm"
+          >
+            <span className="flex size-6 items-center justify-center rounded-full bg-unsure text-xs font-bold text-white">{d.stats.unseated}</span>
+            <span className="flex-1">
+              คน <b>รอดำเนินการ</b> (ยังไม่มีโต๊ะ)
+            </span>
+            <span className="text-muted">ดู ›</span>
+          </button>
+        )}
         {state && tab === "map" && <MapView />}
         {state && tab === "list" && <ListView />}
         {state && tab === "search" && <SearchView />}
@@ -81,11 +94,12 @@ export default function Home() {
           {s.type === "table" && <TableSheet id={s.id} />}
           {s.type === "party" && <PartySheet id={s.id} />}
           {s.type === "pick" && <PickSheet tableId={s.tableId} />}
+          {s.type === "pending" && <PendingSheet />}
         </div>
       ))}
 
       {toast && (
-        <div className="fixed inset-x-0 bottom-20 z-50 flex justify-center px-4">
+        <div className="pointer-events-none fixed inset-x-0 top-24 z-50 flex justify-center px-4">
           <div className="rounded-xl bg-ink px-4 py-2.5 text-sm text-white shadow-lg">{toast}</div>
         </div>
       )}

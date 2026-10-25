@@ -1,12 +1,15 @@
 "use client";
 
-import { groupKey, guestLabel } from "@/lib/layout";
+import { useState } from "react";
+import { groupKey, guestLabel, partyLabel } from "@/lib/layout";
 import { useStore } from "@/lib/store";
 import { Sheet } from "./Sheet";
 import { Button, StatusDot, WarnBadge } from "./ui";
 
 export function TableSheet({ id }: { id: string }) {
-  const { state, d, closeSheet, openSheet, setTableSign, reserveSeat, unreserve, deleteTable, busy } = useStore();
+  const { state, d, closeSheet, openSheet, setTableSign, reserveSeat, unreserve, deleteTable, moveTo, busy } = useStore();
+  // guest whose "เอาออก" was tapped and whose party has several people here: ask whole group or just them
+  const [askRemove, setAskRemove] = useState<string | null>(null);
   if (!state || !d) return null;
   const table = d.tableById.get(id);
   if (!table) return null;
@@ -100,11 +103,29 @@ export function TableSheet({ id }: { id: string }) {
           const wrong = warning?.wrongGuestIds.has(g.id);
           const odd = !wrong && warning?.level === "mixed" && p && groupKey(p) !== mainGroup;
           const pSign = p?.sign_id ? d.signById.get(p.sign_id) : undefined;
+          const groupHere = occ.filter((x) => x.party_id && x.party_id === g.party_id);
+          const removeOne = () => void moveTo(null, [g.id], guestLabel(g, p));
+          const removeGroup = () => void moveTo(null, groupHere.map((x) => x.id), `${p ? partyLabel(p) : ""} (${groupHere.length} คน)`);
+          if (askRemove === g.id)
+            return (
+              <li key={seat} className="flex min-h-12 flex-wrap items-center gap-2 bg-paper px-3 py-2 text-sm">
+                <span className="w-full truncate text-xs text-muted">เอา “{guestLabel(g, p)}” ออกจากโต๊ะ:</span>
+                <button onClick={() => { setAskRemove(null); removeGroup(); }} className="min-h-10 rounded-lg bg-accent px-3 font-medium text-white">
+                  ทั้งกลุ่ม ({groupHere.length} คน)
+                </button>
+                <button onClick={() => { setAskRemove(null); removeOne(); }} className="min-h-10 rounded-lg border border-line bg-card px-3">
+                  เฉพาะคนนี้
+                </button>
+                <button onClick={() => setAskRemove(null)} className="ml-auto min-h-10 px-2 text-muted">
+                  ยกเลิก
+                </button>
+              </li>
+            );
           return (
-            <li key={seat}>
+            <li key={seat} className={`flex items-stretch ${wrong ? "bg-danger/8" : ""}`}>
               <button
                 onClick={() => p && openSheet({ type: "party", id: p.id })}
-                className={`flex min-h-12 w-full items-center gap-3 px-3 py-1.5 text-left text-sm active:bg-paper ${wrong ? "bg-danger/8" : ""}`}
+                className="flex min-h-12 min-w-0 flex-1 items-center gap-3 py-1.5 pl-3 text-left text-sm active:bg-paper"
               >
                 <span className="w-5 text-right tabular-nums text-muted">{seat}</span>
                 <StatusDot status={g.status} />
@@ -116,7 +137,13 @@ export function TableSheet({ id }: { id: string }) {
                     {wrong && ` · ${pSign?.label ?? "ไม่มีป้าย"}`}
                   </span>
                 </span>
-                <span className="text-muted">›</span>
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => (groupHere.length > 1 ? setAskRemove(g.id) : removeOne())}
+                className="shrink-0 px-3 text-xs font-medium text-accent active:bg-accent-soft disabled:opacity-40"
+              >
+                เอาออก
               </button>
             </li>
           );
@@ -127,7 +154,7 @@ export function TableSheet({ id }: { id: string }) {
         <Button
           variant="danger"
           onClick={() => {
-            if (confirm(`ลบโต๊ะ ${d.numbers.get(id)}? คนในโต๊ะจะกลับไปอยู่ “ยังไม่มีโต๊ะ”`)) void deleteTable(id);
+            if (confirm(`ลบโต๊ะ ${d.numbers.get(id)}? คนในโต๊ะจะไปอยู่ใน “รอดำเนินการ”`)) void deleteTable(id);
           }}
         >
           ลบโต๊ะนี้

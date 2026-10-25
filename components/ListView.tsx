@@ -11,7 +11,7 @@ import { inputClass, StatusDot } from "./ui";
 type Filter = "all" | "unseated" | "unsure" | "wrong";
 const FILTERS: [Filter, string][] = [
   ["all", "ทั้งหมด"],
-  ["unseated", "ยังไม่มีโต๊ะ"],
+  ["unseated", "รอดำเนินการ"],
   ["unsure", "ยังไม่ชัวร์"],
   ["wrong", "นั่งผิดกลุ่ม"],
 ];
@@ -103,7 +103,7 @@ export function ListView() {
                               {d.numbers.get(t)}
                             </span>
                           ))}
-                          {unseated > 0 && <span className="rounded-md bg-line px-1.5 py-0.5 text-xs text-muted">ไม่มีโต๊ะ{tables.length ? ` ${unseated}` : ""}</span>}
+                          {unseated > 0 && <span className="rounded-md bg-line px-1.5 py-0.5 text-xs text-muted">รอดำเนินการ{tables.length ? ` ${unseated}` : ""}</span>}
                         </span>
                       </button>
                     </li>

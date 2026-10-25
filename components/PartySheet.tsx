@@ -70,7 +70,7 @@ export function PartySheet({ id }: { id: string }) {
             </button>
           ) : (
             <span key="none" className="rounded-full bg-line px-3 py-1 text-muted">
-              ยังไม่มีโต๊ะ
+              รอดำเนินการ
             </span>
           ),
         )}
@@ -163,7 +163,7 @@ export function PartySheet({ id }: { id: string }) {
                     โต๊ะ {d.numbers.get(m.table_id)}
                   </button>
                 ) : (
-                  <span className="shrink-0 text-xs text-muted">ไม่มีโต๊ะ</span>
+                  <span className="shrink-0 text-xs text-muted">รอดำเนินการ</span>
                 )}
               </div>
               <div className="flex items-center gap-1.5">

@@ -67,7 +67,7 @@ export function SearchView() {
                     <SignChip sign={sign} small />
                   </>
                 ) : (
-                  <span className="text-xs text-muted">ยังไม่มีโต๊ะ</span>
+                  <span className="text-xs text-muted">รอดำเนินการ</span>
                 )}
               </button>
             </li>

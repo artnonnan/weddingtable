@@ -9,7 +9,11 @@ import { STATUS_LABEL, type ChangeLogEntry, type DbState, type Guest, type Guest
 // ---------------------------------------------------------------- UI state
 
 export type Tab = "map" | "list" | "search" | "more";
-export type SheetRef = { type: "table"; id: string } | { type: "party"; id: string } | { type: "pick"; tableId: string };
+export type SheetRef =
+  | { type: "table"; id: string }
+  | { type: "party"; id: string }
+  | { type: "pick"; tableId: string }
+  | { type: "pending" };
 export interface Moving {
   guestIds: string[];
   label: string;
@@ -238,7 +242,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [log, notify, refresh],
   );
 
-  const tableName = useCallback((id: string | null) => (id && d ? `โต๊ะ ${d.numbers.get(id) ?? "?"}` : "ไม่มีโต๊ะ"), [d]);
+  const tableName = useCallback((id: string | null) => (id && d ? `โต๊ะ ${d.numbers.get(id) ?? "?"}` : "รอดำเนินการ"), [d]);
 
   const store: Store = {
     state,
@@ -288,7 +292,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
       if (ok) {
         setMoving(null);
-        notify(tableId ? `ย้าย ${what} ไป${tableName(tableId)} แล้ว` : `เอา ${what} ออกจากโต๊ะแล้ว`);
+        notify(tableId ? `ย้าย ${what} ไป${tableName(tableId)} แล้ว` : `เอา ${what} ออกจากโต๊ะแล้ว → อยู่ใน “รอดำเนินการ”`);
       }
       return ok;
     },
@@ -328,6 +332,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     deleteParty: async (id) => {
       const p = d?.partyById.get(id);
       await run("ลบแขก", p ? `${partyLabel(p)} ×${p.size}` : id, async () => {
+        // remember sheet rows so a later re-import does not bring them back
+        if (p?.source_sheet) {
+          must(
+            await db()
+              .from("import_ignore")
+              .upsert({ source_sheet: p.source_sheet, name: p.name, nickname: p.nickname }, { ignoreDuplicates: true }),
+          );
+        }
         must(await db().from("parties").delete().eq("id", id));
       });
     },
@@ -381,7 +393,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         must(await db().rpc("apply_layout", { p_tables: res.tables, p_seats: res.seats, p_actor: actor }));
         lastSnapshotAt.current = Date.now();
         await refresh();
-        notify(`จัดอัตโนมัติแล้ว: ${res.tables.length} โต๊ะ${res.unseated.length ? ` (ยังไม่มีโต๊ะ ${res.unseated.length} คน)` : ""}`);
+        notify(`จัดอัตโนมัติแล้ว: ${res.tables.length} โต๊ะ${res.unseated.length ? ` (รอดำเนินการ ${res.unseated.length} คน)` : ""}`);
       } catch (e) {
         notify(e instanceof Error ? e.message : String(e));
       } finally {

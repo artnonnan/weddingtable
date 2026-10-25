@@ -3,7 +3,8 @@
 //   npm run import -- --apply   → insert new parties + their guests (existing ones are left alone)
 //   npm run import -- --apply --assign → also run auto-assign (snapshots first)
 //
-// Re-running is safe: a party is "existing" when sheet + name + nickname match.
+// Re-running is safe: a party is "existing" when sheet + name + nickname match,
+// and parties deleted on the web (table import_ignore) are never re-added.
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { buildParties, type SheetTab } from "../lib/importRules";
@@ -29,11 +30,13 @@ const tabs: SheetTab[] = JSON.parse(readFileSync(file, "utf8"));
 const { parties: drafts, skipped } = buildParties(tabs);
 
 const existing = must(await db.from("parties").select("source_sheet,name,nickname")) as Pick<Party, "source_sheet" | "name" | "nickname">[];
-const seen = new Set(existing.map((p) => `${p.source_sheet}|${p.name}|${p.nickname}`));
+const ignored = must(await db.from("import_ignore").select("source_sheet,name,nickname")) as Pick<Party, "source_sheet" | "name" | "nickname">[];
+// rows deleted in the web (no longer coming) count as existing so they are not re-added
+const seen = new Set([...existing, ...ignored].map((p) => `${p.source_sheet}|${p.name}|${p.nickname}`));
 const fresh = drafts.filter((d) => !seen.has(`${d.source_sheet}|${d.name}|${d.nickname}`));
 
 console.log(`sheet: ${drafts.length} parties / ${drafts.reduce((s, d) => s + d.size, 0)} people, skipped ${skipped.length} (not coming)`);
-console.log(`database: ${existing.length} parties already there → ${fresh.length} new`);
+console.log(`database: ${existing.length} parties already there, ${ignored.length} deleted on the web → ${fresh.length} new`);
 for (const d of fresh) console.log(`  + ${d.source_sheet}#${d.source_row} ${d.name || d.nickname} ×${d.size} [sign ${d.sign_id}]`);
 
 if (!apply) {
