@@ -17,6 +17,8 @@ export type SheetRef =
 export interface Moving {
   guestIds: string[];
   label: string;
+  /** set when moving a whole table onto another one */
+  fromTable?: string;
 }
 
 export interface Derived {
@@ -98,6 +100,7 @@ interface Store {
   setActor: (name: string) => void;
   // data actions
   moveTo: (tableId: string | null, guestIds?: string[], label?: string) => Promise<boolean>;
+  moveTable: (fromId: string, toId: string) => Promise<boolean>;
   updateParty: (id: string, patch: Partial<Pick<Party, "name" | "nickname" | "host" | "village" | "sign_id" | "note">>) => Promise<void>;
   setPartySize: (id: string, size: number) => Promise<void>;
   setPartyStatus: (id: string, status: GuestStatus) => Promise<void>;
@@ -294,6 +297,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (ok) {
         setMoving(null);
         notify(tableId ? `ย้าย ${what} ไป${tableName(tableId)} แล้ว` : `เอา ${what} ออกจากโต๊ะแล้ว → อยู่ใน “รอดำเนินการ”`);
+      }
+      return ok;
+    },
+    moveTable: async (fromId, toId) => {
+      const from = tableName(fromId);
+      const to = tableName(toId);
+      let bumped = 0;
+      const ok = await run("ย้ายทั้งโต๊ะ", `${from} → ${to}`, async () => {
+        bumped = must(await db().rpc("move_table", { p_from: fromId, p_to: toId, p_actor: actor })) as number;
+      });
+      if (ok) {
+        setMoving(null);
+        notify(`ย้ายทั้ง${from}ไป${to}แล้ว${bumped ? ` · คนเดิม ${bumped} คนอยู่ใน “รอดำเนินการ”` : ""}`);
       }
       return ok;
     },

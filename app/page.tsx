@@ -42,6 +42,7 @@ export default function Home() {
         <div className="sticky top-[88px] z-30 mx-3 mt-2 flex items-center gap-2 rounded-xl bg-ink px-3 py-2 text-sm text-white shadow-lg">
           <span className="min-w-0 flex-1">
             แตะโต๊ะปลายทางสำหรับ <b className="break-words">{moving.label}</b>
+            {moving.fromTable && <span className="block text-xs text-white/70">คนเดิมของโต๊ะปลายทางจะไปอยู่ใน “รอดำเนินการ”</span>}
           </span>
           <button onClick={cancelMove} className="min-h-9 shrink-0 rounded-lg bg-white/15 px-3">
             ยกเลิก

@@ -7,7 +7,7 @@ import { Sheet } from "./Sheet";
 import { Button, StatusDot, WarnBadge } from "./ui";
 
 export function TableSheet({ id }: { id: string }) {
-  const { state, d, closeSheet, openSheet, setTableSign, reserveSeat, unreserve, deleteTable, moveTo, ackWarning, busy } = useStore();
+  const { state, d, closeSheet, openSheet, setTableSign, reserveSeat, unreserve, deleteTable, moveTo, ackWarning, startMove, busy } = useStore();
   // guest whose "เอาออก" was tapped and whose party has several people here: ask whole group or just them
   const [askRemove, setAskRemove] = useState<string | null>(null);
   if (!state || !d) return null;
@@ -170,7 +170,15 @@ export function TableSheet({ id }: { id: string }) {
         })}
       </ul>
 
-      <div className="mt-6 flex justify-end">
+      <Button
+        className="mt-5 w-full border-2 border-accent! text-accent!"
+        disabled={busy || occ.length === 0}
+        onClick={() => startMove({ guestIds: [], label: `ทั้งโต๊ะ ${d.numbers.get(id)} (${people} คน)`, fromTable: id })}
+      >
+        ⇄ ย้ายทั้งโต๊ะไปแทนที่โต๊ะอื่น
+      </Button>
+
+      <div className="mt-10 flex justify-end border-t border-line pt-4">
         <Button
           variant="danger"
           onClick={() => {

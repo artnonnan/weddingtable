@@ -65,7 +65,7 @@ function AddTableCell({ lane }: { lane: Lane }) {
 }
 
 function TableCard({ table, compact, highlight }: { table: Table; compact?: boolean; highlight?: boolean }) {
-  const { state, d, openSheet, moving, moveTo, focusTable } = useStore();
+  const { state, d, openSheet, moving, moveTo, moveTable, focusTable } = useStore();
   const ref = useRef<HTMLButtonElement>(null);
   const focused = focusTable === table.id;
 
@@ -82,7 +82,17 @@ function TableCard({ table, compact, highlight }: { table: Table; compact?: bool
   const warn = d.warnings.get(table.id)?.shown ?? "none";
   const num = d.numbers.get(table.id);
   const free = cap - people;
-  const canDrop = moving ? free >= moving.guestIds.length : false;
+  const canDrop = !moving ? false : moving.fromTable ? moving.fromTable !== table.id : free >= moving.guestIds.length;
+
+  const onTap = () => {
+    if (!moving) return openSheet({ type: "table", id: table.id });
+    if (!moving.fromTable) return void moveTo(table.id);
+    if (moving.fromTable === table.id) return;
+    const from = d.numbers.get(moving.fromTable);
+    if (people > 0 && !confirm(`ย้ายทั้งโต๊ะ ${from} ไปแทนที่โต๊ะ ${num}?
+คนเดิมในโต๊ะ ${num} (${people} คน) จะไปอยู่ใน “รอดำเนินการ”`)) return;
+    void moveTable(moving.fromTable, table.id);
+  };
 
   const border = warn === "wrong" ? "var(--color-danger)" : warn === "mixed" ? "var(--color-mixed)" : (sign?.color ?? "var(--color-line)");
 
@@ -100,7 +110,7 @@ function TableCard({ table, compact, highlight }: { table: Table; compact?: bool
   return (
     <button
       ref={ref}
-      onClick={() => (moving ? void moveTo(table.id) : openSheet({ type: "table", id: table.id }))}
+      onClick={onTap}
       className={`relative flex min-h-[92px] flex-col items-center justify-center gap-1 rounded-2xl border-2 bg-card px-1 py-2 text-center shadow-sm active:scale-[0.97] ${
         focused || highlight ? "flash" : ""
       } ${moving && !canDrop ? "opacity-35" : ""} ${moving && canDrop ? "ring-2 ring-accent/50" : ""}`}
