@@ -5,13 +5,17 @@ import { useStore } from "@/lib/store";
 import { Sheet } from "./Sheet";
 import { Button, Field, inputClass } from "./ui";
 
+/** Who can edit; the name is what the change history and Telegram show ("อาท" is skipped by Telegram). */
+const EDITOR_NAMES = ["อาท", "โดม", "ทีมต้อนรับ"] as const;
+
 /** Enter the edit PIN (checked by the database) plus a name shown in the change history. */
 export function PinSheet({ onClose }: { onClose: () => void }) {
   const { login } = useStore();
   const [pin, setPin] = useState("");
   const [name, setName] = useState(() => {
     try {
-      return localStorage.getItem("editorName") ?? "";
+      const saved = localStorage.getItem("editorName") ?? "";
+      return (EDITOR_NAMES as readonly string[]).includes(saved) ? saved : "";
     } catch {
       return "";
     }
@@ -54,8 +58,15 @@ export function PinSheet({ onClose }: { onClose: () => void }) {
           void submit();
         }}
       >
-        <Field label="ชื่อของคุณ (ขึ้นในประวัติการแก้ไข)">
-          <input className={inputClass} placeholder="เช่น อาท, โดม, พี่หน้างาน" value={name} onChange={(e) => setName(e.target.value)} />
+        <Field label="คุณคือ (ขึ้นในประวัติการแก้ไข)">
+          <select className={inputClass} value={name} onChange={(e) => setName(e.target.value)}>
+            <option value="" disabled>
+              — เลือก —
+            </option>
+            {EDITOR_NAMES.map((n) => (
+              <option key={n}>{n}</option>
+            ))}
+          </select>
         </Field>
         <Field label="PIN">
           <input
