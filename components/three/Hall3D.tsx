@@ -29,6 +29,15 @@ const NAMES_RADIUS = 2.6; // only the table being looked at (neighbours would ov
 type Zoom = "far" | "mid" | "near";
 const DIM = new THREE.Color("#ebe5dd");
 
+/** Camera moves driven by the on-screen buttons. */
+interface ViewApi {
+  zoom: (factor: number) => void;
+  rotate: (radians: number) => void;
+  tilt: () => void;
+  home: () => void;
+  goTable: (num: number) => boolean;
+}
+
 interface Seat {
   guest: Guest;
   table: Table;
@@ -36,6 +45,14 @@ interface Seat {
   angle: number;
   color: string;
 }
+
+/**
+ * A press only counts as a tap when the finger barely moved and only one finger was down.
+ * Anything else was a pan / pinch, so nothing should open.
+ */
+const press = { x: 0, y: 0, moved: false, fingers: 0 };
+const TAP_SLOP = 8;
+const isTap = () => !press.moved;
 
 /** Clicks on the HTML labels bubble through the 3D canvas too; only real canvas taps count as "empty floor". */
 const onCanvas = (e: Event) => (e.target as HTMLElement | null)?.tagName === "CANVAS";
@@ -58,6 +75,7 @@ export default function Hall3D() {
   const [selected, setSelected] = useState<string | null>(null); // guest id
   const [askMove, setAskMove] = useState(false);
   const focusRef = useRef<((t: Table) => void) | null>(null);
+  const api = useRef<ViewApi | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(480);
 
@@ -98,7 +116,23 @@ export default function Hall3D() {
   };
 
   return (
-    <div ref={box} style={{ height }} className="relative isolate overflow-hidden rounded-2xl border border-line bg-[#f4efe8]">
+    <div
+      ref={box}
+      style={{ height }}
+      className="relative isolate select-none overflow-hidden rounded-2xl border border-line bg-[#f4efe8]"
+      onPointerDownCapture={(e) => {
+        press.fingers += 1;
+        // a second finger means pinch / two-finger pan, never a tap
+        if (press.fingers > 1) press.moved = true;
+        else Object.assign(press, { x: e.clientX, y: e.clientY, moved: false });
+      }}
+      onPointerMoveCapture={(e) => {
+        if (e.pointerType === "mouse" && e.buttons === 0) return;
+        if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > TAP_SLOP) press.moved = true;
+      }}
+      onPointerUpCapture={() => (press.fingers = Math.max(0, press.fingers - 1))}
+      onPointerCancelCapture={() => (press.fingers = Math.max(0, press.fingers - 1))}
+    >
       <Canvas
         dpr={[1, 2]}
         // no adaptive down-scaling: it shrank the drawn area without shrinking the canvas
@@ -106,17 +140,19 @@ export default function Hall3D() {
         // measure without scroll offsets: the sticky "moving" banner and page scroll otherwise shrink the drawing area
         resize={{ scroll: false, debounce: 0 }}
         camera={{ fov: 45, near: 0.1, far: 400, position: [0, 30, 60] }}
-        onPointerMissed={(e) => !moving && onCanvas(e) && setSelected(null)}
+        onPointerMissed={(e) => !moving && isTap() && onCanvas(e) && setSelected(null)}
         fallback={<p className="p-6 text-center text-sm text-muted">เครื่องนี้แสดง 3D ไม่ได้ ใช้โหมด 2D แทน</p>}
       >
-        <Scene selected={selected} onSelect={setSelected} focusRef={focusRef} />
+        <Scene selected={selected} onSelect={setSelected} focusRef={focusRef} apiRef={api} />
       </Canvas>
 
       {!guest && !moving && (
-        <div className="pointer-events-none absolute inset-x-0 top-2 z-20 text-center text-[11px] text-muted">
-          ลากเพื่อหมุน · ถ่างนิ้วเพื่อซูม · แตะคนหรือโต๊ะ
+        <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center"><span className="rounded-full bg-card/85 px-3 py-0.5 text-[11px] text-muted shadow-sm">
+          ลากเพื่อเลื่อน · ถ่างนิ้วเพื่อซูม · หมุนด้วยปุ่มขวาล่าง</span>
         </div>
       )}
+
+      <ViewControls api={api} raised={!!guest} />
 
       {guest && party && (
         <div className="absolute inset-x-2 bottom-2 z-20 rounded-2xl border border-line bg-card/95 p-3 shadow-lg backdrop-blur">
@@ -171,16 +207,107 @@ export default function Hall3D() {
   );
 }
 
+// ---------------------------------------------------------------- on-screen camera buttons
+
+/** Press once for one step; keep holding to repeat. */
+function useRepeat(fn: () => void) {
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stop = () => {
+    if (timer.current) clearInterval(timer.current);
+    timer.current = null;
+  };
+  useEffect(() => stop, []);
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      e.preventDefault();
+      fn();
+      stop();
+      timer.current = setInterval(fn, 160);
+    },
+    onPointerUp: stop,
+    onPointerLeave: stop,
+    onPointerCancel: stop,
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+  };
+}
+
+function CtrlButton({ label, title, onPress, repeat }: { label: string; title: string; onPress: () => void; repeat?: boolean }) {
+  const held = useRepeat(onPress);
+  return (
+    <button
+      aria-label={title}
+      title={title}
+      {...(repeat ? held : { onClick: onPress })}
+      className="flex size-11 items-center justify-center rounded-xl border border-line bg-card/90 text-lg font-semibold text-ink shadow-sm backdrop-blur active:bg-accent-soft"
+    >
+      {label}
+    </button>
+  );
+}
+
+function ViewControls({ api, raised }: { api: React.RefObject<ViewApi | null>; raised: boolean }) {
+  const [askTable, setAskTable] = useState(false);
+  const [num, setNum] = useState("");
+  const [err, setErr] = useState(false);
+  const go = () => {
+    const ok = api.current?.goTable(Number.parseInt(num, 10)) ?? false;
+    setErr(!ok);
+    if (ok) {
+      setAskTable(false);
+      setNum("");
+    }
+  };
+  return (
+    <div className={`absolute right-2 z-20 flex flex-col items-end gap-1.5 transition-[bottom] ${raised ? "bottom-[128px]" : "bottom-2"}`}>
+      {askTable && (
+        <form
+          className="flex items-center gap-1 rounded-xl border border-line bg-card p-1 shadow"
+          onSubmit={(e) => {
+            e.preventDefault();
+            go();
+          }}
+        >
+          <input
+            autoFocus
+            inputMode="numeric"
+            placeholder="เลขโต๊ะ"
+            value={num}
+            onChange={(e) => {
+              setNum(e.target.value.replace(/\D/g, ""));
+              setErr(false);
+            }}
+            className={`h-9 w-20 rounded-lg border px-2 text-center text-base outline-none ${err ? "border-danger" : "border-line"}`}
+          />
+          <button type="submit" className="h-9 rounded-lg bg-accent px-3 text-sm font-medium text-white">
+            ไป
+          </button>
+        </form>
+      )}
+      <CtrlButton label="#" title="ไปโต๊ะ…" onPress={() => setAskTable((v) => !v)} />
+      <CtrlButton label="＋" title="ซูมเข้า" repeat onPress={() => api.current?.zoom(0.8)} />
+      <CtrlButton label="－" title="ซูมออก" repeat onPress={() => api.current?.zoom(1.25)} />
+      <div className="flex gap-1.5">
+        <CtrlButton label="⟲" title="หมุนซ้าย" repeat onPress={() => api.current?.rotate(Math.PI / 8)} />
+        <CtrlButton label="⟳" title="หมุนขวา" repeat onPress={() => api.current?.rotate(-Math.PI / 8)} />
+      </div>
+      <CtrlButton label="◩" title="สลับมุมสูง / มุมเฉียง" onPress={() => api.current?.tilt()} />
+      <CtrlButton label="⌂" title="ดูทั้งห้อง" onPress={() => api.current?.home()} />
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- scene
 
 function Scene({
   selected,
   onSelect,
   focusRef,
+  apiRef,
 }: {
   selected: string | null;
   onSelect: (id: string | null) => void;
   focusRef: React.RefObject<((t: Table) => void) | null>;
+  apiRef: React.RefObject<ViewApi | null>;
 }) {
   const { state, d, moving } = useStore();
   const { tap, canDrop } = useTableTap();
@@ -196,15 +323,45 @@ function Scene({
   const midZ = ((rows - 1) * SZ) / 2;
 
   // initial high oblique view from the back of the hall, whole room in frame
-  useEffect(() => {
+  const homeView = () => {
     const depth = (rows + 1) * SZ;
     const dist = Math.max(30, depth * 1.15);
     const tilt = 0.5; // radians away from straight down
-    camera.position.set(0, dist * Math.cos(tilt), midZ + dist * Math.sin(tilt));
-    controls.current?.target.set(0, 0, midZ);
+    return { target: new THREE.Vector3(0, 0, midZ), pos: new THREE.Vector3(0, dist * Math.cos(tilt), midZ + dist * Math.sin(tilt)) };
+  };
+  useEffect(() => {
+    const h = homeView();
+    camera.position.copy(h.pos);
+    controls.current?.target.copy(h.target);
     controls.current?.update();
     updateNames();
   }, []);
+
+  // on-screen buttons: every move is relative to where the camera is heading and animated by the goal below
+  const fly = (offsetFn: (o: THREE.Vector3) => THREE.Vector3) => {
+    const c = controls.current;
+    if (!c) return;
+    const from = goal.current ?? { target: c.target.clone(), pos: camera.position.clone() };
+    const o = offsetFn(from.pos.clone().sub(from.target));
+    o.setLength(THREE.MathUtils.clamp(o.length(), 4, 120));
+    goal.current = { target: from.target.clone(), pos: from.target.clone().add(o) };
+  };
+  apiRef.current = {
+    zoom: (f) => fly((o) => o.multiplyScalar(f)),
+    rotate: (a) => fly((o) => o.applyAxisAngle(new THREE.Vector3(0, 1, 0), a)),
+    tilt: () =>
+      fly((o) => {
+        const sph = new THREE.Spherical().setFromVector3(o);
+        sph.phi = sph.phi < 0.55 ? 0.95 : 0.25; // nearly straight down <-> oblique
+        return new THREE.Vector3().setFromSpherical(sph);
+      }),
+    home: () => (goal.current = homeView()),
+    goTable: (num) => {
+      const t = state!.tables.find((x) => d!.numbers.get(x.id) === num);
+      if (t) focusOn(t);
+      return !!t;
+    },
+  };
 
   const seats: Seat[] = useMemo(() => {
     const out: Seat[] = [];
@@ -244,7 +401,10 @@ function Scene({
     c.target.lerp(goal.current.target, 0.12);
     camera.position.lerp(goal.current.pos, 0.12);
     c.update();
-    if (camera.position.distanceTo(goal.current.pos) < 0.05) goal.current = null;
+    if (camera.position.distanceTo(goal.current.pos) < 0.05 && c.target.distanceTo(goal.current.target) < 0.05) {
+      goal.current = null;
+      updateNames();
+    }
   });
 
   // which tables show guest names: near the look-at point when zoomed in, plus the selected one
@@ -286,6 +446,7 @@ function Scene({
   });
 
   const selectGuest = (s: Seat) => {
+    if (!isTap()) return;
     if (moving) return tap(s.table.id); // while moving, tapping anyone means "this table"
     onSelect(s.guest.kind === "guest" ? s.guest.id : null);
     focusOn(s.table);
@@ -304,13 +465,31 @@ function Scene({
         maxPolarAngle={Math.PI / 2.15}
         minDistance={4}
         maxDistance={120}
+        // like a map: one finger moves around, two fingers zoom; rotating is done with the buttons
+        touches={{ ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN }}
+        mouseButtons={{ LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
+        screenSpacePanning={false}
         onStart={() => (goal.current = null)}
         onEnd={updateNames}
-        onChange={() => goal.current && updateNames()}
+        onChange={() => {
+          // keep the view over the hall
+          const c = controls.current;
+          if (c) {
+            const x = THREE.MathUtils.clamp(c.target.x, -SX * 2, SX * 2);
+            const z = THREE.MathUtils.clamp(c.target.z, -SZ * 1.5, rows * SZ);
+            if (x !== c.target.x || z !== c.target.z) {
+              camera.position.x += x - c.target.x;
+              camera.position.z += z - c.target.z;
+              c.target.x = x;
+              c.target.z = z;
+            }
+          }
+          if (goal.current) updateNames();
+        }}
       />
 
       {/* floor + stage */}
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0, midZ]} onClick={(e) => !moving && onCanvas(e.nativeEvent) && onSelect(null)}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0, midZ]} onClick={(e) => !moving && isTap() && onCanvas(e.nativeEvent) && onSelect(null)}>
         <planeGeometry args={[SX * 3 + 10, rows * SZ + 16]} />
         <meshStandardMaterial color="#efe7dc" />
       </mesh>
@@ -332,6 +511,7 @@ function Scene({
           zoom={zoom}
           selected={selected}
           onTap={() => {
+            if (!isTap()) return;
             tap(t.id);
             if (!moving) focusOn(t);
           }}
@@ -389,7 +569,7 @@ function Scene({
           <capsuleGeometry args={[0.2, 0.32, 4, 8]} />
           <meshStandardMaterial color="#ffffff" transparent opacity={0.45} />
           {held.map((s) => (
-            <Instance key={s.guest.id} position={[s.pos.x, 0.78, s.pos.z]} onClick={(e) => (e.stopPropagation(), tap(s.table.id))} />
+            <Instance key={s.guest.id} position={[s.pos.x, 0.78, s.pos.z]} onClick={(e) => (e.stopPropagation(), isTap() && tap(s.table.id))} />
           ))}
         </Instances>
       )}
@@ -488,7 +668,7 @@ function Table3D({
       <TentCard label={sign?.label ?? "ไม่มีป้าย"} color={sign?.color ?? "#a8a29e"} onTap={onTap} />
 
       {/* floating badge: number + sign, readable from far away */}
-      <Html position={[0, showNames ? 3.0 : 2.0, 0]} center zIndexRange={[10, 0]}>
+      <Html position={[0, showNames ? 3.9 : 2.0, 0]} center zIndexRange={[10, 0]}>
         {zoom === "far" ? (
           <button
             onClick={onTap}
@@ -532,7 +712,7 @@ function Table3D({
             return (
               <Html key={g.id} position={[Math.sin(a) * r, 1.15, Math.cos(a) * r]} center zIndexRange={[isSel ? 11 : 10, 0]}>
                 <button
-                  onClick={() => g.kind === "guest" && onSelectGuest(g)}
+                  onClick={() => isTap() && g.kind === "guest" && onSelectGuest(g)}
                   className={`flex max-w-[132px] items-center gap-1 overflow-hidden rounded-full border bg-white/95 pr-2 text-left shadow-sm ${
                     isSel ? "border-accent text-[13px] font-semibold" : "border-black/10 text-[11px]"
                   }`}
