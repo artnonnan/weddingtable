@@ -71,21 +71,56 @@ function seatAngle(seatNo: number, cap: number) {
 // ---------------------------------------------------------------- root
 
 export default function Hall3D() {
-  const { state, d, moving, canEdit, openSheet, startMove, focusTable } = useStore();
+  const { state, d, moving, canEdit, openSheet, startMove, cancelMove, focusTable, sheets } = useStore();
   const [selected, setSelected] = useState<string | null>(null); // guest id
   const [askMove, setAskMove] = useState(false);
   const focusRef = useRef<((t: Table) => void) | null>(null);
   const api = useRef<ViewApi | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(480);
+  const [full, setFull] = useState(false);
+  const sheetsOpen = useRef(0);
+  sheetsOpen.current = sheets.length;
 
-  // fill the screen between this box and the bottom tab bar
+  // fill the screen between this box and the bottom tab bar (re-measured after leaving full screen)
   useLayoutEffect(() => {
+    if (full) return;
     const fit = () => box.current && setHeight(Math.max(380, window.innerHeight - box.current.getBoundingClientRect().top - window.scrollY - 76));
     fit();
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
-  }, []);
+  }, [full]);
+
+  // Full screen: the box covers the page (works on iPhone too); where the browser allows it,
+  // real full screen also hides the address bar. Leaving native full screen (back / Esc) leaves ours too.
+  const toggleFull = () => {
+    const next = !full;
+    setFull(next);
+    try {
+      if (next && document.documentElement.requestFullscreen && !document.fullscreenElement) {
+        void document.documentElement.requestFullscreen().catch(() => {});
+      } else if (!next && document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => {});
+      }
+    } catch {
+      /* not supported: the CSS cover is enough */
+    }
+  };
+  useEffect(() => {
+    if (!full) return;
+    const onFs = () => !document.fullscreenElement && setFull(false);
+    // Esc closes an open sheet first; only with nothing open does it leave full screen
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && sheetsOpen.current === 0 && setFull(false);
+    document.addEventListener("fullscreenchange", onFs);
+    window.addEventListener("keydown", onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [full]);
 
   // after a move finishes, keep the highlight a moment so you see where they went
   const wasMoving = useRef(false);
@@ -118,8 +153,9 @@ export default function Hall3D() {
   return (
     <div
       ref={box}
-      style={{ height }}
-      className="relative isolate select-none overflow-hidden rounded-2xl border border-line bg-[#f4efe8]"
+      style={{ height: full ? "100dvh" : height }}
+      // full screen sits above the header and tab bar but below sheets (z-40), so tapping a table still works
+      className={`isolate select-none overflow-hidden bg-[#f4efe8] ${full ? "fixed inset-0 z-[35]" : "relative rounded-2xl border border-line"}`}
       onPointerDownCapture={(e) => {
         press.fingers += 1;
         // a second finger means pinch / two-finger pan, never a tap
@@ -147,8 +183,29 @@ export default function Hall3D() {
       </Canvas>
 
       {!guest && !moving && (
-        <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center"><span className="rounded-full bg-card/85 px-3 py-0.5 text-[11px] text-muted shadow-sm">
+        <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center pl-2 pr-16"><span className="rounded-full bg-card/85 px-3 py-0.5 text-[11px] text-muted shadow-sm">
           ลากเพื่อเลื่อน · ถ่างนิ้วเพื่อซูม · หมุนด้วยปุ่มขวาล่าง</span>
+        </div>
+      )}
+
+      <button
+        onClick={toggleFull}
+        aria-label={full ? "ออกจากเต็มจอ" : "เต็มจอ"}
+        title={full ? "ออกจากเต็มจอ" : "เต็มจอ"}
+        className="absolute right-2 top-2 z-30 flex h-10 items-center gap-1 rounded-xl border border-line bg-card/90 px-3 text-sm font-medium text-ink shadow-sm backdrop-blur active:bg-accent-soft"
+      >
+        {full ? "✕ ย่อ" : "⛶"}
+      </button>
+
+      {/* in full screen the page's own "moving" banner is covered, so repeat it here */}
+      {full && moving && (
+        <div className="absolute left-2 right-24 top-2 z-30 flex items-center gap-2 rounded-xl bg-ink px-3 py-2 text-sm text-white shadow-lg">
+          <span className="min-w-0 flex-1 truncate">
+            แตะโต๊ะปลายทาง: <b>{moving.label}</b>
+          </span>
+          <button onClick={cancelMove} className="min-h-8 shrink-0 rounded-lg bg-white/15 px-2.5">
+            ยกเลิก
+          </button>
         </div>
       )}
 
