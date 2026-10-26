@@ -10,9 +10,10 @@ const SIGNS: Sign[] = [
   { id: 2, label: "ญาติเจ้าสาว", color: "", side: "bride", sort_order: 2 },
   { id: 3, label: "แขกเจ้าสาว", color: "", side: "bride", sort_order: 3 },
   { id: 4, label: "ที่ทำงานเจ้าสาว", color: "", side: "bride", sort_order: 4 },
-  { id: 5, label: "ญาติเจ้าบ่าว", color: "", side: "groom", sort_order: 5 },
-  { id: 6, label: "แขกเจ้าบ่าว", color: "", side: "groom", sort_order: 6 },
-  { id: 7, label: "เพื่อนเจ้าบ่าว", color: "", side: "groom", sort_order: 7 },
+  { id: 8, label: "เพื่อนเจ้าสาว", color: "", side: "bride", sort_order: 5 },
+  { id: 5, label: "ญาติเจ้าบ่าว", color: "", side: "groom", sort_order: 6 },
+  { id: 6, label: "แขกเจ้าบ่าว", color: "", side: "groom", sort_order: 7 },
+  { id: 7, label: "เพื่อนเจ้าบ่าว", color: "", side: "groom", sort_order: 8 },
 ];
 
 const tabs: SheetTab[] = JSON.parse(readFileSync(process.argv[2] ?? "data/sheet-raw.json", "utf8"));
