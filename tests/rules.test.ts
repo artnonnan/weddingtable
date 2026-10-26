@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildParties, normalizeVillage, parseSize, SIGN } from "../lib/importRules";
 import { autoAssign, tableNumbers, tableWarning } from "../lib/layout";
+import { partyColors, SOLO_COLOR } from "../lib/partyColors";
 import { cleanThai, searchKey } from "../lib/thai";
 import type { Guest, Party, Settings, Sign, Table } from "../lib/types";
 
@@ -113,6 +114,18 @@ describe("autoAssign", () => {
     const w = tableWarning(table, guests, new Map(parties.map((p) => [p.id, p])), SIGNS);
     expect(w.level).toBe("wrong");
     expect([...w.wrongGuestIds]).toEqual(["p2g1"]);
+  });
+
+  it("gives groups at one table different colours and solo guests grey", () => {
+    const { parties, guests } = fixture([
+      ["แม่ดาว", 3, "a", 2], ["แม่ดาว", 3, "b", 2], ["แม่ดาว", 3, "c", 2], ["แม่ดาว", 3, "d", 1], ["แม่ดาว", 3, "e", 1],
+    ]);
+    const seated = guests.map((g) => ({ ...g, table_id: "t" }));
+    const colors = partyColors(parties, seated, [{ id: "t", lane: "bride", pos: 0, sign_id: 3 }]);
+    const groupColors = ["p1", "p2", "p3"].map((id) => colors.get(id));
+    expect(new Set(groupColors).size).toBe(3);
+    expect(colors.get("p4")).toBe(SOLO_COLOR);
+    expect(colors.get("p5")).toBe(SOLO_COLOR);
   });
 
   it("hides an acknowledged warning until the mix changes", () => {

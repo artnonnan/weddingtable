@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { groupKey, guestLabel, partyLabel } from "@/lib/layout";
+import { SOLO_COLOR } from "@/lib/partyColors";
 import { useStore } from "@/lib/store";
 import { Sheet } from "./Sheet";
 import { Button, StatusDot, WarnBadge } from "./ui";
@@ -219,7 +220,12 @@ export function TableSheet({ id }: { id: string }) {
               </li>
             );
           return (
-            <li key={seat} className={`relative flex items-stretch ${wrong ? "bg-danger/8" : ""} ${pickSeat === seat ? "bg-accent-soft" : ""}`}>
+            <li
+              key={seat}
+              className={`relative flex items-stretch border-l-[5px] ${wrong ? "bg-danger/8" : ""} ${pickSeat === seat ? "bg-accent-soft" : ""}`}
+              // same group colour as the pieces in 3D (grey = came alone)
+              style={{ borderLeftColor: d.partyColor.get(g.party_id ?? "") ?? SOLO_COLOR }}
+            >
               <span className="flex items-center pl-2">
                 <SeatNo seat={seat} />
               </span>

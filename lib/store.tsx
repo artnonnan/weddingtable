@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { autoAssign, partyLabel, tableNumbers, tableWarning, type TableWarning } from "./layout";
+import { partyColors } from "./partyColors";
 import { buildSearch, type SearchHit } from "./search";
 import { db, must, setEditToken } from "./supabase";
 import { STATUS_LABEL, type ChangeLogEntry, type DbState, type Guest, type GuestStatus, type Lane, type Party, type Settings, type Sign, type SnapshotMeta, type Table } from "./types";
@@ -9,6 +10,7 @@ import { STATUS_LABEL, type ChangeLogEntry, type DbState, type Guest, type Guest
 // ---------------------------------------------------------------- UI state
 
 export type Tab = "map" | "list" | "search" | "more";
+export type MapMode = "2d" | "3d";
 export type SheetRef =
   | { type: "table"; id: string }
   | { type: "party"; id: string }
@@ -29,6 +31,8 @@ export interface Derived {
   membersByParty: Map<string, Guest[]>;
   numbers: Map<string, number>;
   warnings: Map<string, TableWarning>;
+  /** colour per party (groups distinct per table, solo guests grey) */
+  partyColor: Map<string, string>;
   stats: { people: number; seated: number; unseated: number; free: number; reserved: number; unsure: number; warnTables: number };
   search: (q: string, limit?: number) => SearchHit[];
 }
@@ -62,6 +66,7 @@ function derive(s: DbState): Derived {
     membersByParty,
     numbers: tableNumbers(s.tables, s.settings.bride_side),
     warnings,
+    partyColor: partyColors(s.parties, s.guests, s.tables),
     stats: {
       people: people.length,
       seated,
@@ -85,6 +90,8 @@ interface Store {
   // ui
   tab: Tab;
   setTab: (t: Tab) => void;
+  mapMode: MapMode;
+  setMapMode: (m: MapMode) => void;
   sheets: SheetRef[];
   openSheet: (s: SheetRef) => void;
   closeSheet: () => void;
@@ -152,6 +159,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("map");
+  const [mapMode, setMapModeState] = useState<MapMode>("2d");
   const [sheets, setSheets] = useState<SheetRef[]>([]);
   const [moving, setMoving] = useState<Moving | null>(null);
   const [focusTable, setFocusTable] = useState<string | null>(null);
@@ -181,6 +189,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .rpc("check_edit_session")
       .then(({ data }) => (typeof data === "string" && data ? setEditor(data) : dropEditor()));
   }, [dropEditor]);
+
+  // remember 2D / 3D per device
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("mapMode") === "3d") setMapModeState("3d");
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // view-only devices have no "เพิ่มเติม" tab
   useEffect(() => {
@@ -305,6 +322,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setTab: (t) => {
       setTab(t);
       setSheets([]);
+    },
+    mapMode,
+    setMapMode: (m) => {
+      setMapModeState(m);
+      try {
+        localStorage.setItem("mapMode", m);
+      } catch {
+        /* ignore */
+      }
     },
     sheets,
     openSheet: (s) => setSheets((st) => [...st, s]),

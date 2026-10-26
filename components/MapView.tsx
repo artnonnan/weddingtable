@@ -1,16 +1,25 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useRef } from "react";
 import { physicalLanes } from "@/lib/layout";
 import { useStore } from "@/lib/store";
 import type { Lane, Table } from "@/lib/types";
 import { WarnBadge } from "./ui";
+import { useTableTap } from "./useTableTap";
+
+// three.js is only downloaded when someone switches to 3D
+const Hall3D = dynamic(() => import("./three/Hall3D"), {
+  ssr: false,
+  loading: () => <p className="py-20 text-center text-sm text-muted">กำลังโหลดโหมด 3D…</p>,
+});
 
 const LANE_TITLE: Record<Lane, string> = { bride: "ฝั่งเจ้าสาว", middle: "แถวกลาง", groom: "ฝั่งเจ้าบ่าว" };
 
 export function MapView({ highlight, compact }: { highlight?: string | null; compact?: boolean }) {
-  const { state, d, moving, canEdit } = useStore();
+  const { state, d, moving, canEdit, mapMode, setMapMode } = useStore();
   if (!state || !d) return null;
+  const is3d = !compact && mapMode === "3d";
   const lanes = physicalLanes(state.settings.bride_side);
   // "+ เพิ่มโต๊ะ" sits in the first empty cell after the end of each lane
   const laneEnd = Object.fromEntries(lanes.map((l) => [l, Math.max(-1, ...state.tables.filter((t) => t.lane === l).map((t) => t.pos)) + 1]));
@@ -20,24 +29,45 @@ export function MapView({ highlight, compact }: { highlight?: string | null; com
 
   return (
     <div className={compact ? "" : "px-3 pb-4"}>
-      <div className={`mx-auto mb-3 rounded-xl bg-accent text-center font-semibold tracking-widest text-white ${compact ? "py-1 text-xs" : "py-2.5 text-sm"}`}>
-        เวที
-      </div>
-      {!compact && state.tables.length > 0 && (
-        <div className="mb-2 text-center text-xs text-muted">
-          เช็คแล้ว <b className="text-ok">{state.tables.filter((t) => t.checked_at).length}</b> / {state.tables.length} โต๊ะ
+      {!is3d && (
+        <div className={`mx-auto mb-3 rounded-xl bg-accent text-center font-semibold tracking-widest text-white ${compact ? "py-1 text-xs" : "py-2.5 text-sm"}`}>
+          เวที
         </div>
       )}
       {!compact && (
+        <div className="mb-2 flex items-center justify-between text-xs text-muted">
+          <span>
+            {state.tables.length > 0 && (
+              <>
+                เช็คแล้ว <b className="text-ok">{state.tables.filter((t) => t.checked_at).length}</b> / {state.tables.length} โต๊ะ
+              </>
+            )}
+          </span>
+          <span className="flex overflow-hidden rounded-full border border-line bg-card text-xs font-semibold">
+            {(["2d", "3d"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMapMode(m)}
+                className={`min-h-8 px-3 ${mapMode === m ? "bg-ink text-white" : "text-muted"}`}
+              >
+                {m.toUpperCase()}
+              </button>
+            ))}
+          </span>
+        </div>
+      )}
+      {is3d && <Hall3D />}
+      {!is3d && !compact && (
         <div className="mb-1 grid grid-cols-3 gap-2 text-center text-[11px] font-medium text-muted">
           {lanes.map((l) => (
             <div key={l}>{LANE_TITLE[l]}</div>
           ))}
         </div>
       )}
-      {rows === 0 && !compact && (
+      {!is3d && rows === 0 && !compact && (
         <p className="py-10 text-center text-sm text-muted">ยังไม่มีโต๊ะ</p>
       )}
+      {!is3d && (
       <div className={`grid grid-cols-3 ${compact ? "gap-1" : "gap-2"}`}>
         {Array.from({ length: rows }, (_, pos) =>
           lanes.map((lane) => {
@@ -48,6 +78,7 @@ export function MapView({ highlight, compact }: { highlight?: string | null; com
           }),
         )}
       </div>
+      )}
     </div>
   );
 }
@@ -70,7 +101,8 @@ function AddTableCell({ lane }: { lane: Lane }) {
 }
 
 function TableCard({ table, compact, highlight }: { table: Table; compact?: boolean; highlight?: boolean }) {
-  const { state, d, openSheet, moving, moveTo, moveTable, focusTable } = useStore();
+  const { state, d, moving, focusTable } = useStore();
+  const { tap, canDrop: canDropOn } = useTableTap();
   const ref = useRef<HTMLButtonElement>(null);
   const focused = focusTable === table.id;
 
@@ -86,18 +118,8 @@ function TableCard({ table, compact, highlight }: { table: Table; compact?: bool
   const sign = table.sign_id ? d.signById.get(table.sign_id) : undefined;
   const warn = d.warnings.get(table.id)?.shown ?? "none";
   const num = d.numbers.get(table.id);
-  const free = cap - people;
-  const canDrop = !moving ? false : moving.fromTable ? moving.fromTable !== table.id : free >= moving.guestIds.length;
-
-  const onTap = () => {
-    if (!moving) return openSheet({ type: "table", id: table.id });
-    if (!moving.fromTable) return void moveTo(table.id);
-    if (moving.fromTable === table.id) return;
-    const from = d.numbers.get(moving.fromTable);
-    if (people > 0 && !confirm(`ย้ายทั้งโต๊ะ ${from} ไปแทนที่โต๊ะ ${num}?
-คนเดิมในโต๊ะ ${num} (${people} คน) จะไปอยู่ใน “รอดำเนินการ”`)) return;
-    void moveTable(moving.fromTable, table.id);
-  };
+  const canDrop = canDropOn(table.id);
+  const onTap = () => tap(table.id);
 
   const border = warn === "wrong" ? "var(--color-danger)" : warn === "mixed" ? "var(--color-mixed)" : (sign?.color ?? "var(--color-line)");
 
