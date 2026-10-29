@@ -14,7 +14,7 @@ export const GROUP_PALETTE = [
   "#7C3AED", // violet
   "#B8A100", // olive yellow
   "#8B4513", // brown
-  "#111827", // near black
+  "#84CC16", // lime
 ];
 export const SOLO_COLOR = "#C9C5C0";
 

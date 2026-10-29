@@ -27,7 +27,7 @@ export const SIGN = {
 } as const;
 
 /** Name fragments that identify the VIP parties (all in พ่อถวัลย์'s tab). */
-const VIP_NAME_PARTS = ["สุวิวัฒน์", "ไลไธสง", "ชัชวาลย์", "ทรงยศ"];
+const VIP_NAME_PARTS = ["สุวิวัฒน์", "ไลไธสง", "สังวาลย์", "ทรงยศ"];
 /** Groom's relatives, by nickname (all in แม่พริ้งเพรา's tab). */
 const GROOM_FAMILY_NICKNAMES = ["ป้าสาย", "น้าดุล", "น้าราญ"];
 
