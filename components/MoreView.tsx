@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useStore } from "@/lib/store";
 import type { ChangeLogEntry, SnapshotMeta } from "@/lib/types";
-import { Button, Field, inputClass } from "./ui";
+import { Button, inputClass } from "./ui";
 
 const fmt = (iso: string) =>
   new Date(iso).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -18,9 +18,8 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function MoreView() {
-  const { state, editor, logout, updateSettings, addTable, runAutoAssign, busy } = useStore();
+  const { state, editor, logout } = useStore();
   if (!state) return null;
-  const s = state.settings;
 
   return (
     <div className="px-3 pb-6">
@@ -31,63 +30,6 @@ export function MoreView() {
             <span className="block text-xs text-muted">ชื่อนี้จะขึ้นในประวัติการแก้ไขและแจ้งเตือน</span>
           </span>
           <Button onClick={() => void logout()}>ออกจากโหมดแก้ไข</Button>
-        </div>
-      </Card>
-
-      <Card title="ผังห้อง">
-        <div className="space-y-4">
-          <Field label="ฝั่งเจ้าสาว (มองไปทางเวที)">
-            <div className="grid grid-cols-2 gap-2">
-              {(["left", "right"] as const).map((side) => (
-                <Button key={side} variant={s.bride_side === side ? "primary" : "default"} onClick={() => void updateSettings({ bride_side: side })}>
-                  {side === "left" ? "ซ้าย" : "ขวา"}
-                </Button>
-              ))}
-            </div>
-          </Field>
-          <Field label="โต๊ะต่อแถว (เว้นว่าง = ให้ระบบคำนวณ)">
-            <input
-              className={inputClass}
-              inputMode="numeric"
-              placeholder="อัตโนมัติ"
-              defaultValue={s.rows_per_lane ?? ""}
-              onBlur={(e) => {
-                const v = e.target.value.trim() ? Number.parseInt(e.target.value, 10) : null;
-                if (v !== s.rows_per_lane && (v === null || (v > 0 && v <= 50))) void updateSettings({ rows_per_lane: v });
-              }}
-            />
-          </Field>
-          <Field label="โต๊ะเผื่อแขกนอกรายชื่อ (ทั้งโต๊ะเป็น “จองไว้” วางท้ายแถว)">
-            <div className="flex items-center gap-2">
-              <Button onClick={() => void updateSettings({ reserve_tables: Math.max(0, s.reserve_tables - 1) })}>−</Button>
-              <span className="w-10 text-center text-lg font-semibold tabular-nums">{s.reserve_tables}</span>
-              <Button onClick={() => void updateSettings({ reserve_tables: Math.min(20, s.reserve_tables + 1) })}>+</Button>
-              <span className="text-xs text-muted">ใช้ตอนกดจัดอัตโนมัติ</span>
-            </div>
-          </Field>
-          <div>
-            <div className="mb-1 text-xs font-medium text-muted">เพิ่มโต๊ะเปล่าต่อท้ายแถว</div>
-            <div className="grid grid-cols-3 gap-2">
-              <Button onClick={() => void addTable("bride")}>เจ้าสาว</Button>
-              <Button onClick={() => void addTable("middle")}>กลาง</Button>
-              <Button onClick={() => void addTable("groom")}>เจ้าบ่าว</Button>
-            </div>
-          </div>
-          <div className="rounded-xl bg-accent-soft p-3">
-            <p className="mb-2 text-sm">
-              <b>จัดอัตโนมัติ</b> จะจัดทุกคนลงโต๊ะใหม่ทั้งหมดตามป้าย/หมู่บ้าน (ผังเดิมถูกเขียนทับ แต่ระบบเก็บ snapshot ไว้ให้กู้คืนได้)
-            </p>
-            <Button
-              variant="primary"
-              className="w-full"
-              disabled={busy}
-              onClick={() => {
-                if (confirm("จัดที่นั่งใหม่ทั้งหมด? ผังปัจจุบันจะถูกเขียนทับ (กู้คืนได้จาก snapshot)")) void runAutoAssign();
-              }}
-            >
-              จัดอัตโนมัติ
-            </Button>
-          </div>
         </div>
       </Card>
 

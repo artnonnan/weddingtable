@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { autoAssign, partyLabel, tableNumbers, tableWarning, type TableWarning } from "./layout";
+import { partyLabel, tableNumbers, tableWarning, type TableWarning } from "./layout";
 import { partyColors } from "./partyColors";
 import { buildSearch, type SearchHit } from "./search";
 import { db, must, setEditToken } from "./supabase";
@@ -126,9 +126,7 @@ interface Store {
   deleteTable: (id: string) => Promise<void>;
   reserveSeat: (tableId: string) => Promise<void>;
   unreserve: (guestId: string) => Promise<void>;
-  updateSettings: (patch: Partial<Omit<Settings, "id">>) => Promise<void>;
   updateSign: (id: number, patch: Partial<Pick<Sign, "label" | "color">>) => Promise<void>;
-  runAutoAssign: () => Promise<void>;
   createSnapshot: (reason: string) => Promise<void>;
   restoreSnapshot: (id: number) => Promise<void>;
   listSnapshots: () => Promise<SnapshotMeta[]>;
@@ -494,30 +492,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         must(await db().from("guests").delete().eq("id", guestId).eq("kind", "reserved"));
       });
     },
-    updateSettings: async (patch) => {
-      await run("ตั้งค่าผัง", JSON.stringify(patch), async () => {
-        must(await db().from("settings").update(patch).eq("id", 1));
-      });
-    },
     updateSign: async (id, patch) => {
       await run("แก้ป้ายโต๊ะ", `${d?.signById.get(id)?.label} → ${patch.label ?? ""}`, async () => {
         must(await db().from("signs").update(patch).eq("id", id));
       });
-    },
-    runAutoAssign: async () => {
-      if (!state || !(await ensureEditor())) return;
-      const res = autoAssign({ settings: state.settings, signs: state.signs, parties: state.parties, guests: state.guests });
-      setBusy(true);
-      try {
-        must(await db().rpc("apply_layout", { p_tables: res.tables, p_seats: res.seats, p_actor: actor }));
-        lastSnapshotAt.current = Date.now();
-        await refresh();
-        notify(`จัดอัตโนมัติแล้ว: ${res.tables.length} โต๊ะ${res.unseated.length ? ` (รอดำเนินการ ${res.unseated.length} คน)` : ""}`);
-      } catch (e) {
-        notify(e instanceof Error ? e.message : String(e));
-      } finally {
-        setBusy(false);
-      }
     },
     createSnapshot: async (reason) => {
       if (!(await ensureEditor())) return;
