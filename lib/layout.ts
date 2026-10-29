@@ -47,7 +47,8 @@ export interface TableWarning {
 
 /**
  * wrong = someone at the table belongs to another sign (or several signs share an unsigned table).
- * mixed = everyone matches the sign but they come from different host/village groups (VIP exempt).
+ * mixed = everyone matches the sign but they come from different host/village groups.
+ * VIP tables never warn: whoever the couple seats there is meant to be there.
  */
 export function tableWarning(table: Table, occupants: Guest[], partyById: Map<string, Party>, signs: Sign[]): TableWarning {
   const make = (level: WarnLevel): TableWarning => {
@@ -59,6 +60,7 @@ export function tableWarning(table: Table, occupants: Guest[], partyById: Map<st
   const wrongGuestIds = new Set<string>();
   const signIds = new Set<number | null>();
   const groups = new Set<string>();
+  if (signs.find((s) => s.id === table.sign_id)?.side === "vip") return make("none");
   for (const g of people) {
     const p = partyById.get(g.party_id!);
     if (!p) continue;
@@ -69,8 +71,7 @@ export function tableWarning(table: Table, occupants: Guest[], partyById: Map<st
   if (wrongGuestIds.size > 0 || (table.sign_id == null && signIds.size > 1)) {
     return make("wrong");
   }
-  const isVip = signs.find((s) => s.id === table.sign_id)?.side === "vip";
-  if (!isVip && groups.size > 1) return make("mixed");
+  if (groups.size > 1) return make("mixed");
   return make("none");
 }
 

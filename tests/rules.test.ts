@@ -116,6 +116,14 @@ describe("autoAssign", () => {
     expect([...w.wrongGuestIds]).toEqual(["p2g1"]);
   });
 
+  it("never warns at a VIP table", () => {
+    const { parties, guests } = fixture([["พ่อถวัลย์", 1, "a", 2], ["แม่พริ้งเพรา", 6, "b", 1], ["อาท", 6, "c", 1]]);
+    const table: Table = { id: "t", lane: "middle", pos: 0, sign_id: 1 };
+    const w = tableWarning(table, guests, new Map(parties.map((p) => [p.id, p])), SIGNS);
+    expect(w.level).toBe("none");
+    expect(w.wrongGuestIds.size).toBe(0);
+  });
+
   it("gives groups at one table different colours and solo guests grey", () => {
     const { parties, guests } = fixture([
       ["แม่ดาว", 3, "a", 2], ["แม่ดาว", 3, "b", 2], ["แม่ดาว", 3, "c", 2], ["แม่ดาว", 3, "d", 1], ["แม่ดาว", 3, "e", 1],
