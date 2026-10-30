@@ -115,6 +115,8 @@ interface Store {
   moveTo: (tableId: string | null, guestIds?: string[], label?: string) => Promise<boolean>;
   moveTable: (fromId: string, toId: string) => Promise<boolean>;
   relocateTable: (id: string, lane: Lane, pos: number) => Promise<boolean>;
+  /** 1 = leave an empty spot in front of this table (it and those behind move back), -1 = close that spot */
+  shiftLane: (id: string, delta: 1 | -1) => Promise<boolean>;
   updateParty: (id: string, patch: Partial<Pick<Party, "name" | "nickname" | "host" | "village" | "sign_id" | "note">>) => Promise<void>;
   setPartySize: (id: string, size: number) => Promise<void>;
   setPartyStatus: (id: string, status: GuestStatus) => Promise<void>;
@@ -420,6 +422,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ? `ย้ายโต๊ะ ${from} แล้ว`
             : `ย้ายแล้ว — โต๊ะ ${from} ตอนนี้คือโต๊ะ ${to}${renumbered ? ` · เลขโต๊ะอื่นเปลี่ยน ${renumbered} โต๊ะ` : ""}`,
         );
+      }
+      return ok;
+    },
+    shiftLane: async (id, delta) => {
+      const t = d?.tableById.get(id);
+      if (!state || !t) return false;
+      const before = d?.numbers ?? new Map<string, number>();
+      const after = tableNumbers(
+        state.tables.map((x) => (x.lane === t.lane && x.pos >= t.pos ? { ...x, pos: x.pos + delta } : x)),
+        state.settings.bride_side,
+      );
+      const name = `โต๊ะ ${before.get(id)}`;
+      const renumbered = state.tables.filter((x) => before.get(x.id) !== after.get(x.id)).length;
+      const action = delta === 1 ? "แทรกช่องว่าง" : "ปิดช่องว่าง";
+      const ok = await run(action, `${delta === 1 ? "ก่อน" : "หน้า"}${name} (${LANE_LABEL[t.lane]})`, async () => {
+        must(await db().rpc("shift_lane", { p_table: id, p_delta: delta }));
+      });
+      if (ok) {
+        notify(`${action}${delta === 1 ? "ก่อน" : "หน้า"}${name}แล้ว — ${name}ตอนนี้คือโต๊ะ ${after.get(id)}${renumbered > 1 ? ` · เลขเปลี่ยน ${renumbered} โต๊ะ` : ""}`);
       }
       return ok;
     },

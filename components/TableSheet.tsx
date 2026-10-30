@@ -4,11 +4,12 @@ import { useState } from "react";
 import { groupKey, guestLabel, partyLabel } from "@/lib/layout";
 import { SOLO_COLOR } from "@/lib/partyColors";
 import { useStore } from "@/lib/store";
+import { LANE_LABEL } from "@/lib/types";
 import { Sheet } from "./Sheet";
 import { Button, StatusDot, WarnBadge } from "./ui";
 
 export function TableSheet({ id }: { id: string }) {
-  const { state, d, closeSheet, openSheet, setTableSign, reserveSeat, unreserve, deleteTable, moveTo, ackWarning, startMove, setChecked, setSeatOrder, canEdit, busy } = useStore();
+  const { state, d, closeSheet, openSheet, setTableSign, reserveSeat, unreserve, deleteTable, moveTo, ackWarning, startMove, setChecked, setSeatOrder, shiftLane, canEdit, busy } = useStore();
   // guest whose "เอาออก" was tapped and whose party has several people here: ask whole group or just them
   const [askRemove, setAskRemove] = useState<string | null>(null);
   // seat number tapped first when re-ordering; the next seat tapped is where that person goes
@@ -23,6 +24,7 @@ export function TableSheet({ id }: { id: string }) {
   const warning = d.warnings.get(id);
   const people = occ.filter((g) => g.kind === "guest").length;
   const sign = table.sign_id ? d.signById.get(table.sign_id) : undefined;
+  const gapInFront = table.pos > 0 && !state.tables.some((t) => t.lane === table.lane && t.pos === table.pos - 1);
 
   // the most common group at the table, to point out who is "different"
   const counts = new Map<string, number>();
@@ -274,6 +276,15 @@ export function TableSheet({ id }: { id: string }) {
       >
         ↕ ย้ายตำแหน่งโต๊ะไปช่องว่าง
       </Button>
+      <div className="mt-2 flex gap-2">
+        <Button className="flex-1" disabled={busy} onClick={() => void shiftLane(id, 1)}>
+          ⤓ แทรกช่องว่างก่อนโต๊ะนี้
+        </Button>
+        <Button className="flex-1" disabled={busy || !gapInFront} onClick={() => void shiftLane(id, -1)}>
+          ⤒ ปิดช่องว่างข้างหน้า
+        </Button>
+      </div>
+      <p className="mt-1 text-xs text-muted">โต๊ะนี้และทุกโต๊ะข้างหลังใน{LANE_LABEL[table.lane]}จะเลื่อน 1 ช่อง · คนย้ายไปพร้อมโต๊ะ เลขโต๊ะนับใหม่</p>
 
       <div className="mt-10 flex justify-end border-t border-line pt-4">
         <Button
