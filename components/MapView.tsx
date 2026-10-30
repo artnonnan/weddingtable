@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useRef } from "react";
 import { physicalLanes } from "@/lib/layout";
 import { useStore } from "@/lib/store";
-import type { Lane, Table } from "@/lib/types";
+import { LANE_LABEL, type Lane, type Table } from "@/lib/types";
 import { WarnBadge } from "./ui";
 import { useTableTap } from "./useTableTap";
 
@@ -14,17 +14,21 @@ const Hall3D = dynamic(() => import("./three/Hall3D"), {
   loading: () => <p className="py-20 text-center text-sm text-muted">กำลังโหลดโหมด 3D…</p>,
 });
 
-const LANE_TITLE: Record<Lane, string> = { bride: "ฝั่งเจ้าสาว", middle: "แถวกลาง", groom: "ฝั่งเจ้าบ่าว" };
-
 export function MapView({ highlight, compact }: { highlight?: string | null; compact?: boolean }) {
   const { state, d, moving, canEdit, mapMode, setMapMode } = useStore();
   if (!state || !d) return null;
-  const is3d = !compact && mapMode === "3d";
+  const relocating = !compact && moving?.relocate ? moving.relocate : null;
+  // picking an empty spot only works on the 2D grid
+  const is3d = !compact && mapMode === "3d" && !relocating;
   const lanes = physicalLanes(state.settings.bride_side);
   // "+ เพิ่มโต๊ะ" sits in the first empty cell after the end of each lane
   const laneEnd = Object.fromEntries(lanes.map((l) => [l, Math.max(-1, ...state.tables.filter((t) => t.lane === l).map((t) => t.pos)) + 1]));
   const showAdd = canEdit && !compact && !moving;
-  const rows = Math.max(0, ...state.tables.map((t) => t.pos + 1), ...(showAdd ? lanes.map((l) => laneEnd[l] + 1) : []));
+  const rows = Math.max(
+    0,
+    ...state.tables.map((t) => t.pos + 1 + (relocating ? 1 : 0)), // one spare row at the end while relocating
+    ...(showAdd ? lanes.map((l) => laneEnd[l] + 1) : []),
+  );
   const at = new Map(state.tables.map((t) => [`${t.lane}:${t.pos}`, t]));
 
   return (
@@ -34,7 +38,7 @@ export function MapView({ highlight, compact }: { highlight?: string | null; com
           เวที
         </div>
       )}
-      {!compact && (
+      {!compact && !relocating && (
         <div className="mb-2 flex items-center justify-between text-xs text-muted">
           <span>
             {state.tables.length > 0 && (
@@ -60,7 +64,7 @@ export function MapView({ highlight, compact }: { highlight?: string | null; com
       {!is3d && !compact && (
         <div className="mb-1 grid grid-cols-3 gap-2 text-center text-[11px] font-medium text-muted">
           {lanes.map((l) => (
-            <div key={l}>{LANE_TITLE[l]}</div>
+            <div key={l}>{LANE_LABEL[l]}</div>
           ))}
         </div>
       )}
@@ -72,7 +76,8 @@ export function MapView({ highlight, compact }: { highlight?: string | null; com
         {Array.from({ length: rows }, (_, pos) =>
           lanes.map((lane) => {
             const t = at.get(`${lane}:${pos}`);
-            if (t) return <TableCard key={t.id} table={t} compact={compact} highlight={highlight === t.id} />;
+            if (t) return <TableCard key={t.id} table={t} compact={compact} highlight={highlight === t.id || relocating === t.id} />;
+            if (relocating) return <DropSpotCell key={`spot:${lane}:${pos}`} tableId={relocating} lane={lane} pos={pos} />;
             if (showAdd && pos === laneEnd[lane]) return <AddTableCell key={`add:${lane}`} lane={lane} />;
             return <div key={`${lane}:${pos}`} />;
           }),
@@ -90,12 +95,26 @@ function AddTableCell({ lane }: { lane: Lane }) {
       disabled={busy}
       onClick={async () => {
         await addTable(lane);
-        notify(`เพิ่มโต๊ะต่อท้าย${LANE_TITLE[lane]}แล้ว — แตะโต๊ะเพื่อเลือกป้าย`);
+        notify(`เพิ่มโต๊ะต่อท้าย${LANE_LABEL[lane]}แล้ว — แตะโต๊ะเพื่อเลือกป้าย`);
       }}
       className="flex min-h-[92px] flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-line text-muted active:bg-card disabled:opacity-40"
     >
       <span className="text-2xl leading-none">+</span>
       <span className="text-xs">เพิ่มโต๊ะ</span>
+    </button>
+  );
+}
+
+function DropSpotCell({ tableId, lane, pos }: { tableId: string; lane: Lane; pos: number }) {
+  const { relocateTable, busy } = useStore();
+  return (
+    <button
+      disabled={busy}
+      onClick={() => void relocateTable(tableId, lane, pos)}
+      className="flex min-h-[92px] flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-accent/60 bg-accent/5 text-accent active:bg-accent/15 disabled:opacity-40"
+    >
+      <span className="text-xl leading-none">↓</span>
+      <span className="text-xs">วางที่นี่</span>
     </button>
   );
 }

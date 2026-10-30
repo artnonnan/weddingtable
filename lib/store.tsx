@@ -5,7 +5,7 @@ import { partyLabel, tableNumbers, tableWarning, type TableWarning } from "./lay
 import { partyColors } from "./partyColors";
 import { buildSearch, type SearchHit } from "./search";
 import { db, must, setEditToken } from "./supabase";
-import { STATUS_LABEL, type ChangeLogEntry, type DbState, type Guest, type GuestStatus, type Lane, type Party, type Settings, type Sign, type SnapshotMeta, type Table } from "./types";
+import { LANE_LABEL, STATUS_LABEL, type ChangeLogEntry, type DbState, type Guest, type GuestStatus, type Lane, type Party, type Settings, type Sign, type SnapshotMeta, type Table } from "./types";
 
 // ---------------------------------------------------------------- UI state
 
@@ -21,6 +21,8 @@ export interface Moving {
   label: string;
   /** set when moving a whole table onto another one */
   fromTable?: string;
+  /** set when moving a table itself to an empty spot on the map (everything at it comes along) */
+  relocate?: string;
 }
 
 export interface Derived {
@@ -112,6 +114,7 @@ interface Store {
   // data actions
   moveTo: (tableId: string | null, guestIds?: string[], label?: string) => Promise<boolean>;
   moveTable: (fromId: string, toId: string) => Promise<boolean>;
+  relocateTable: (id: string, lane: Lane, pos: number) => Promise<boolean>;
   updateParty: (id: string, patch: Partial<Pick<Party, "name" | "nickname" | "host" | "village" | "sign_id" | "note">>) => Promise<void>;
   setPartySize: (id: string, size: number) => Promise<void>;
   setPartyStatus: (id: string, status: GuestStatus) => Promise<void>;
@@ -394,6 +397,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (ok) {
         setMoving(null);
         notify(`ย้ายทั้ง${from}ไป${to}แล้ว${bumped ? ` · คนเดิม ${bumped} คนอยู่ใน “รอดำเนินการ”` : ""}`);
+      }
+      return ok;
+    },
+    relocateTable: async (id, lane, pos) => {
+      if (!state) return false;
+      const before = d?.numbers ?? new Map<string, number>();
+      const after = tableNumbers(
+        state.tables.map((t) => (t.id === id ? { ...t, lane, pos } : t)),
+        state.settings.bride_side,
+      );
+      const from = before.get(id);
+      const to = after.get(id);
+      const renumbered = state.tables.filter((t) => t.id !== id && before.get(t.id) !== after.get(t.id)).length;
+      const ok = await run("ย้ายตำแหน่งโต๊ะ", `โต๊ะ ${from} → ${LANE_LABEL[lane]} แถว ${pos + 1} (เลขใหม่ ${to})`, async () => {
+        must(await db().from("tables").update({ lane, pos }).eq("id", id));
+      });
+      if (ok) {
+        setMoving(null);
+        notify(
+          from === to
+            ? `ย้ายโต๊ะ ${from} แล้ว`
+            : `ย้ายแล้ว — โต๊ะ ${from} ตอนนี้คือโต๊ะ ${to}${renumbered ? ` · เลขโต๊ะอื่นเปลี่ยน ${renumbered} โต๊ะ` : ""}`,
+        );
       }
       return ok;
     },

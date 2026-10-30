@@ -267,6 +267,13 @@ export function TableSheet({ id }: { id: string }) {
       >
         ⇄ ย้ายทั้งโต๊ะไปแทนที่โต๊ะอื่น
       </Button>
+      <Button
+        className="mt-2 w-full"
+        disabled={busy}
+        onClick={() => startMove({ guestIds: [], label: `โต๊ะ ${d.numbers.get(id)}`, relocate: id })}
+      >
+        ↕ ย้ายตำแหน่งโต๊ะไปช่องว่าง
+      </Button>
 
       <div className="mt-10 flex justify-end border-t border-line pt-4">
         <Button

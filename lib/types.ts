@@ -1,5 +1,8 @@
 export type Lane = "bride" | "middle" | "groom";
 export type Side = "vip" | "bride" | "groom";
+
+export const LANE_LABEL: Record<Lane, string> = { bride: "ฝั่งเจ้าสาว", middle: "แถวกลาง", groom: "ฝั่งเจ้าบ่าว" };
+
 export type GuestStatus = "confirmed" | "unsure" | "seated";
 
 export const HOSTS = ["พ่อถวัลย์", "แม่พริ้งเพรา", "อาท", "แม่ดาว", "โดม"] as const;

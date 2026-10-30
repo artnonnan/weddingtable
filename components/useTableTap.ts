@@ -8,6 +8,7 @@ export function useTableTap() {
 
   const canDrop = (tableId: string): boolean => {
     if (!moving || !state || !d) return false;
+    if (moving.relocate) return false;
     if (moving.fromTable) return moving.fromTable !== tableId;
     const people = (d.guestsByTable.get(tableId) ?? []).filter((g) => g.kind === "guest" && !moving.guestIds.includes(g.id)).length;
     return state.settings.seats_per_table - people >= moving.guestIds.length;
@@ -16,6 +17,7 @@ export function useTableTap() {
   const tap = (tableId: string) => {
     if (!d) return;
     if (!moving) return openSheet({ type: "table", id: tableId });
+    if (moving.relocate) return;
     if (!moving.fromTable) return void moveTo(tableId);
     if (moving.fromTable === tableId) return;
     const from = d.numbers.get(moving.fromTable);
