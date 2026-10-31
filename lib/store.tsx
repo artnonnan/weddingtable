@@ -36,7 +36,7 @@ export interface Derived {
   /** colour per party (groups distinct per table, solo guests grey) */
   partyColor: Map<string, string>;
   stats: { people: number; seated: number; unseated: number; free: number; reserved: number; unsure: number; warnTables: number };
-  search: (q: string, limit?: number) => SearchHit[];
+  search: (q: string, limit?: number, keep?: (h: SearchHit) => boolean) => SearchHit[];
 }
 
 const HOURLY_MS = 60 * 60 * 1000;

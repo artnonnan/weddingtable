@@ -24,12 +24,20 @@ export function buildSearch(guests: Guest[], partyById: Map<string, Party>) {
   }
   const fuse = new Fuse(docs, { keys: ["keys"], threshold: 0.35, ignoreLocation: true });
 
-  return (query: string, limit = 30): SearchHit[] => {
+  /** `keep` narrows the hits (e.g. one side or one host); fuzzy matches are filtered before the limit applies. */
+  return (query: string, limit = 30, keep?: (h: SearchHit) => boolean): SearchHit[] => {
     const q = searchKey(query);
     if (!q) return [];
-    const exact = docs.filter((d) => d.keys.some((k) => k.includes(q)));
+    const ok = (d: Doc) => !keep || keep(d);
+    const exact = docs.filter((d) => ok(d) && d.keys.some((k) => k.includes(q)));
     const seen = new Set(exact.map((d) => d.guest.id));
-    const fuzzy = exact.length >= limit ? [] : fuse.search(q, { limit }).map((r) => r.item).filter((d) => !seen.has(d.guest.id));
+    const fuzzy =
+      exact.length >= limit
+        ? []
+        : fuse
+            .search(q, keep ? undefined : { limit })
+            .map((r) => r.item)
+            .filter((d) => ok(d) && !seen.has(d.guest.id));
     return [...exact, ...fuzzy].slice(0, limit);
   };
 }
