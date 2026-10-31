@@ -1,6 +1,7 @@
 "use client";
 
 import { Mali } from "next/font/google";
+import { useEffect, useState } from "react";
 import { signFontPt, signLines } from "@/lib/layout";
 import { useStore } from "@/lib/store";
 
@@ -8,6 +9,7 @@ const mali = Mali({ subsets: ["thai", "latin"], weight: "700" });
 
 /** The 5×7 in design scaled to a quarter of A4 (148.5 mm tall); it is 1 mm wider than the cell, so the sides crop evenly. */
 const FACE_SCALE = 148.5 / 177.8;
+const SHRINK_KEY = "signPrintShrink";
 
 /** One face of a tent card on public/sign-template.jpg (template/template.svg without its text). */
 function Face({ num, label, flip }: { num: number | undefined; label: string; flip?: boolean }) {
@@ -33,6 +35,24 @@ function Face({ num, label, flip }: { num: number | undefined; label: string; fl
 /** Two tables per A4 sheet: each column is one tent card, cut along the vertical line and folded along the horizontal one. */
 export default function PrintSigns() {
   const { state, d, error } = useStore();
+  // borderless printing enlarges the page past the paper; shrinking around the centre keeps the art and the cut/fold lines in place
+  const [shrink, setShrink] = useState(0);
+  useEffect(() => {
+    try {
+      setShrink(Number(localStorage.getItem(SHRINK_KEY)) || 0);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const chooseShrink = (n: number) => {
+    setShrink(n);
+    try {
+      localStorage.setItem(SHRINK_KEY, String(n));
+    } catch {
+      /* ignore */
+    }
+  };
+
   if (error) return <p className="p-6 text-danger">{error}</p>;
   if (!state || !d) return <p className="p-6 text-muted">กำลังโหลด…</p>;
 
@@ -47,14 +67,26 @@ export default function PrintSigns() {
           พิมพ์ {sheets.length} แผ่น
         </button>
         <span className="text-sm text-muted">{tables.length} โต๊ะ · A4 แนวตั้ง · ไม่มีขอบ · ตัดตามเส้นแนวตั้ง พับตามเส้นแนวนอน</span>
+        <label className="ml-auto flex shrink-0 items-center gap-2 text-sm">
+          ย่อชดเชยขอบ
+          <select className="min-h-9 rounded-lg border border-line bg-card px-2" value={shrink} onChange={(e) => chooseShrink(Number(e.target.value))}>
+            {[0, 1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>
+                {n}%
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       <div className="flex flex-col items-center gap-6 bg-paper py-6 print:block print:gap-0 print:bg-white print:py-0">
         {sheets.map((pair) => (
-          <div key={pair[0].id} className={`sheet relative grid h-[297mm] w-[210mm] grid-cols-2 overflow-hidden bg-white shadow print:shadow-none ${mali.className}`} style={{ color: "#7c5a32" }}>
+          <div key={pair[0].id} className={`sheet relative h-[297mm] w-[210mm] overflow-hidden bg-white shadow print:shadow-none ${mali.className}`} style={{ color: "#7c5a32" }}>
+            <div className="grid size-full grid-cols-2" style={{ transform: `scale(${1 - shrink / 100})` }}>
             {[true, false].flatMap((flip) =>
               // an odd table count leaves the last sheet's right column empty, so the left one still folds
               [pair[0], pair[1]].map((t, col) => (t ? <Face key={`${col}-${flip}`} num={d.numbers.get(t.id)} label={d.signById.get(t.sign_id!)!.label} flip={flip} /> : <div key={`${col}-${flip}`} />)),
             )}
+            </div>
             <span className="absolute inset-y-0 left-1/2 border-l border-dashed border-black/30" />
             <span className="absolute inset-x-0 top-1/2 border-t border-dashed border-black/30" />
           </div>

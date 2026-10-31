@@ -17,6 +17,7 @@ describe("printed signs", () => {
   it("keeps template size for short labels and shrinks long ones", () => {
     expect(signFontPt(["ครอบครัว", "เจ้าสาว"])).toBe(56);
     expect(signFontPt(["เพื่อนร่วมงานบริษัทกสิกรไทย"])).toBeLessThan(56);
+    expect(signFontPt(["VIP"])).toBe(84);
   });
 });
 
