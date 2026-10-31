@@ -1,9 +1,49 @@
 import { describe, expect, it } from "vitest";
+import { carInfos, isGroomSide } from "../lib/cars";
 import { buildParties, normalizeVillage, parseSize, SIGN } from "../lib/importRules";
 import { autoAssign, tableNumbers, tableWarning } from "../lib/layout";
 import { partyColors, SOLO_COLOR } from "../lib/partyColors";
 import { cleanThai, searchKey } from "../lib/thai";
-import type { Guest, Party, Settings, Sign, Table } from "../lib/types";
+import type { Car, Guest, Party, Settings, Sign, Table } from "../lib/types";
+
+describe("cars", () => {
+  const party = { id: "p", name: "พี่ฮวด", nickname: "", size: 2, sign_id: 6 } as Party;
+  const parties = new Map([["p", party]]);
+  const rider = (id: string, member_no: number, car_id: string | null) =>
+    ({ id, kind: "guest", party_id: "p", member_no, display_name: null, status: "confirmed", table_id: null, seat_no: null, car_id }) as Guest;
+  const car = (id: string, patch: Partial<Car>): Car => ({ id, kind: "car", driver_guest_id: null, driver_name: "", seats: 5, created_at: id, ...patch });
+
+  it("counts a typed driver who is not on the guest list", () => {
+    const [info] = carInfos([car("a", { driver_name: "กัมปนาท" })], [rider("1", 1, "a"), rider("2", 2, "a"), rider("3", 1, null)], parties);
+    expect(info.used).toBe(3);
+    expect(info.title).toBe("รถกัมปนาท");
+    expect(info.passengers.map((g) => g.id)).toEqual(["1", "2"]);
+  });
+
+  it("counts a guest driver once and keeps them out of the passengers", () => {
+    const [info] = carInfos([car("a", { driver_guest_id: "1" })], [rider("1", 1, "a"), rider("2", 2, "a")], parties);
+    expect(info.used).toBe(2);
+    expect(info.driverLabel).toBe("พี่ฮวด 1/2");
+    expect(info.passengers.map((g) => g.id)).toEqual(["2"]);
+  });
+
+  it("flags too many people and a missing driver, and numbers vans", () => {
+    const [full, van] = carInfos(
+      [car("a", { driver_name: "ก", seats: 2 }), car("b", { kind: "van", seats: 13 })],
+      [rider("1", 1, "a"), rider("2", 2, "a")],
+      parties,
+    );
+    expect(full.over).toBe(true);
+    expect(van.title).toBe("รถตู้ 1");
+    expect(van.driverLabel).toBeNull();
+    expect(van.used).toBe(0);
+  });
+
+  it("arranges the groom's side and VIPs only", () => {
+    const signs = new Map([1, 3, 6].map((id) => [id, { id, side: id === 1 ? "vip" : id === 3 ? "bride" : "groom" } as Sign]));
+    expect([1, 3, 6, null].map((sign_id) => isGroomSide({ sign_id } as Party, signs))).toEqual([true, false, true, false]);
+  });
+});
 
 describe("cleanThai", () => {
   it("drops marks repeated on one consonant", () => {

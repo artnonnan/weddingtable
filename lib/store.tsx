@@ -1,21 +1,25 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { carInfos, isGroomSide, type CarInfo } from "./cars";
 import { partyLabel, tableNumbers, tableWarning, type TableWarning } from "./layout";
 import { partyColors } from "./partyColors";
 import { buildSearch, type SearchHit } from "./search";
 import { db, must, setEditToken } from "./supabase";
-import { LANE_LABEL, STATUS_LABEL, type ChangeLogEntry, type DbState, type Guest, type GuestStatus, type Lane, type Party, type Settings, type Sign, type SnapshotMeta, type Table } from "./types";
+import { LANE_LABEL, STATUS_LABEL, type Car, type ChangeLogEntry, type DbState, type Guest, type GuestStatus, type Lane, type Party, type Settings, type Sign, type SnapshotMeta, type Table } from "./types";
 
 // ---------------------------------------------------------------- UI state
 
-export type Tab = "map" | "list" | "search" | "more";
+export type Tab = "map" | "list" | "search" | "cars" | "more";
 export type MapMode = "2d" | "3d";
 export type SheetRef =
   | { type: "table"; id: string }
   | { type: "party"; id: string }
   | { type: "pick"; tableId: string }
-  | { type: "pending" };
+  | { type: "pending" }
+  | { type: "car"; id: string }
+  | { type: "carForm"; id: string | null }
+  | { type: "carPick"; carId: string };
 export interface Moving {
   guestIds: string[];
   label: string;
@@ -37,6 +41,10 @@ export interface Derived {
   partyColor: Map<string, string>;
   stats: { people: number; seated: number; unseated: number; free: number; reserved: number; unsure: number; warnTables: number };
   search: (q: string, limit?: number, keep?: (h: SearchHit) => boolean) => SearchHit[];
+  cars: CarInfo[];
+  carById: Map<string, CarInfo>;
+  /** groom's side + VIP: the people the cars tab arranges */
+  groomGuests: Guest[];
 }
 
 const HOURLY_MS = 60 * 60 * 1000;
@@ -60,7 +68,11 @@ function derive(s: DbState): Derived {
   const people = s.guests.filter((g) => g.kind === "guest");
   const reserved = s.guests.filter((g) => g.kind === "reserved" && g.table_id).length;
   const seated = people.filter((g) => g.table_id).length;
+  const cars = carInfos(s.cars, s.guests, partyById);
   return {
+    cars,
+    carById: new Map(cars.map((c) => [c.car.id, c])),
+    groomGuests: people.filter((g) => isGroomSide(g.party_id ? partyById.get(g.party_id) : undefined, signById)),
     partyById,
     signById,
     tableById,
@@ -136,6 +148,10 @@ interface Store {
   restoreSnapshot: (id: number) => Promise<void>;
   listSnapshots: () => Promise<SnapshotMeta[]>;
   listChanges: () => Promise<ChangeLogEntry[]>;
+  saveCar: (id: string | null, draft: Pick<Car, "kind" | "driver_guest_id" | "driver_name" | "seats">, label: string) => Promise<string | null>;
+  deleteCar: (id: string) => Promise<boolean>;
+  /** carId null = they come on their own */
+  setGuestsCar: (guestIds: string[], carId: string | null, label: string) => Promise<boolean>;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -216,12 +232,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const c = db();
-      const [settings, signs, tables, parties, guests] = await Promise.all([
+      const [settings, signs, tables, parties, guests, cars] = await Promise.all([
         c.from("settings").select("*").eq("id", 1).single(),
         c.from("signs").select("*").order("sort_order"),
         c.from("tables").select("id,lane,pos,sign_id,warn_ack,checked_at,checked_by"),
         c.from("parties").select("*").order("created_at"),
-        c.from("guests").select("id,kind,party_id,member_no,display_name,status,table_id,seat_no"),
+        c.from("guests").select("id,kind,party_id,member_no,display_name,status,table_id,seat_no,car_id"),
+        c.from("cars").select("*"),
       ]);
       setState({
         settings: must(settings) as Settings,
@@ -229,6 +246,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         tables: must(tables) as Table[],
         parties: must(parties) as Party[],
         guests: must(guests) as Guest[],
+        cars: must(cars) as Car[],
       });
       setError(null);
     } catch (e) {
@@ -571,6 +589,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       must(await db().from("snapshots").select("id,at,reason,actor").order("id", { ascending: false }).limit(100)) as SnapshotMeta[],
     listChanges: async () =>
       must(await db().from("change_log").select("*").order("id", { ascending: false }).limit(200)) as ChangeLogEntry[],
+    saveCar: async (id, draft, label) => {
+      let saved: string | null = null;
+      await run(id ? "แก้ข้อมูลรถ" : "เพิ่มรถ", `${label} (${draft.seats} ที่นั่ง)`, async () => {
+        saved = must(
+          await db().rpc("save_car", {
+            p_id: id,
+            p_kind: draft.kind,
+            p_driver_guest: draft.driver_guest_id,
+            p_driver_name: draft.driver_name,
+            p_seats: draft.seats,
+          }),
+        ) as string;
+      });
+      return saved;
+    },
+    deleteCar: async (id) =>
+      run("ลบรถ", d?.carById.get(id)?.title ?? id, async () => {
+        must(await db().from("cars").delete().eq("id", id));
+      }),
+    setGuestsCar: async (guestIds, carId, label) =>
+      run(carId ? "จัดคนขึ้นรถ" : "เอาคนลงจากรถ", `${label} → ${carId ? (d?.carById.get(carId)?.title ?? "") : "มาเอง"}`, async () => {
+        must(await db().rpc("set_guests_car", { p_guest_ids: guestIds, p_car: carId }));
+      }),
   };
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;

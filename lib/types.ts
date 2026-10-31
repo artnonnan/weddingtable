@@ -65,6 +65,22 @@ export interface Guest {
   status: GuestStatus;
   table_id: string | null;
   seat_no: number | null;
+  /** null = comes on their own */
+  car_id?: string | null;
+}
+
+export type CarKind = "car" | "van";
+
+export const CAR_KIND_LABEL: Record<CarKind, string> = { car: "รถส่วนตัว", van: "รถตู้" };
+
+export interface Car {
+  id: string;
+  kind: CarKind;
+  /** the driver is a guest, or else a typed name (not on the guest list) */
+  driver_guest_id: string | null;
+  driver_name: string;
+  seats: number;
+  created_at: string;
 }
 
 export interface ChangeLogEntry {
@@ -88,4 +104,5 @@ export interface DbState {
   tables: Table[];
   parties: Party[];
   guests: Guest[];
+  cars: Car[];
 }

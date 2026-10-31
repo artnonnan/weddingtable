@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { CarFormSheet, CarPickSheet, CarSheet } from "@/components/CarSheet";
+import { CarsView } from "@/components/CarsView";
 import { ListView } from "@/components/ListView";
 import { MapView } from "@/components/MapView";
 import { MoreView } from "@/components/MoreView";
@@ -16,6 +18,7 @@ const TABS: [Tab, string, string][] = [
   ["map", "ผัง", "▦"],
   ["list", "รายชื่อ", "☰"],
   ["search", "ค้นหา", "⌕"],
+  ["cars", "รถ", "🚐"],
   ["more", "เพิ่มเติม", "⋯"],
 ];
 
@@ -93,11 +96,12 @@ export default function Home() {
         {state && tab === "map" && <MapView />}
         {state && tab === "list" && <ListView />}
         {state && tab === "search" && <SearchView />}
+        {state && tab === "cars" && <CarsView />}
         {state && tab === "more" && <MoreView />}
       </main>
 
       <nav className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <div className={`mx-auto grid max-w-xl ${canEdit ? "grid-cols-4" : "grid-cols-3"}`}>
+        <div className={`mx-auto grid max-w-xl ${canEdit ? "grid-cols-5" : "grid-cols-4"}`}>
           {tabs.map(([t, label, icon]) => (
             <button
               key={t}
@@ -117,6 +121,9 @@ export default function Home() {
           {s.type === "party" && <PartySheet id={s.id} />}
           {s.type === "pick" && <PickSheet tableId={s.tableId} />}
           {s.type === "pending" && <PendingSheet />}
+          {s.type === "car" && <CarSheet id={s.id} />}
+          {s.type === "carForm" && <CarFormSheet id={s.id} />}
+          {s.type === "carPick" && <CarPickSheet carId={s.carId} />}
         </div>
       ))}
 
