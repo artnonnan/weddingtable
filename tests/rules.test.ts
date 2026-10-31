@@ -1,10 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { carInfos, isGroomSide } from "../lib/cars";
 import { buildParties, normalizeVillage, parseSize, SIGN } from "../lib/importRules";
-import { autoAssign, tableNumbers, tableWarning } from "../lib/layout";
+import { autoAssign, signFontPt, signLines, tableNumbers, tableWarning } from "../lib/layout";
 import { partyColors, SOLO_COLOR } from "../lib/partyColors";
 import { cleanThai, searchKey } from "../lib/thai";
 import type { Car, Guest, Party, Settings, Sign, Table } from "../lib/types";
+
+describe("printed signs", () => {
+  it("breaks before เจ้าสาว / เจ้าบ่าว only", () => {
+    expect(signLines("ญาติเจ้าสาว")).toEqual(["ญาติ", "เจ้าสาว"]);
+    expect(signLines("เพื่อนเจ้าบ่าว")).toEqual(["เพื่อน", "เจ้าบ่าว"]);
+    expect(signLines("กสิกร")).toEqual(["กสิกร"]);
+    expect(signLines("เจ้าสาว")).toEqual(["เจ้าสาว"]);
+  });
+
+  it("keeps template size for short labels and shrinks long ones", () => {
+    expect(signFontPt(["ครอบครัว", "เจ้าสาว"])).toBe(56);
+    expect(signFontPt(["เพื่อนร่วมงานบริษัทกสิกรไทย"])).toBeLessThan(56);
+  });
+});
 
 describe("cars", () => {
   const party = { id: "p", name: "พี่ฮวด", nickname: "", size: 2, sign_id: 6 } as Party;

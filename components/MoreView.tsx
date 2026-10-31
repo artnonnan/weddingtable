@@ -38,7 +38,7 @@ export function MoreView() {
       <Card title="พิมพ์">
         <div className="grid grid-cols-2 gap-2">
           <a href="/print/signs" target="_blank" className="flex min-h-11 items-center justify-center rounded-xl border border-line text-sm font-medium">
-            ป้ายโต๊ะ (A4)
+            ป้ายโต๊ะ
           </a>
           <a href="/print/map" target="_blank" className="flex min-h-11 items-center justify-center rounded-xl border border-line text-sm font-medium">
             ผังรวม + รายชื่อ

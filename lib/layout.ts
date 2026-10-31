@@ -14,6 +14,17 @@ export function guestLabel(g: Guest, party: Party | undefined): string {
   return party.size > 1 ? `${base} ${g.member_no}/${party.size}` : base;
 }
 
+/** A printed sign's label, broken before เจ้าสาว / เจ้าบ่าว: "ญาติเจ้าสาว" → ["ญาติ", "เจ้าสาว"]. */
+export function signLines(label: string): string[] {
+  return label.split(/(?=เจ้า(?:สาว|บ่าว))/).map((l) => l.trim()).filter(Boolean);
+}
+
+/** Largest font size (pt) that keeps the longest line inside the template's white panel. Thai marks take no width. */
+export function signFontPt(lines: string[]): number {
+  const chars = Math.max(1, ...lines.map((l) => l.replace(/[ัิ-ฺ็-๎]/g, "").length));
+  return Math.min(56, Math.floor(270 / (chars * 0.67)));
+}
+
 export function groupKey(p: Pick<Party, "host" | "village">): string {
   return `${p.host}·${p.village}`;
 }
