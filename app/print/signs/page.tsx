@@ -1,14 +1,14 @@
 "use client";
 
 import { Mali } from "next/font/google";
-import { useEffect, useState } from "react";
-import { signFontPt, signLines } from "@/lib/layout";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { signLines } from "@/lib/layout";
 import { useStore } from "@/lib/store";
 
 const mali = Mali({ subsets: ["thai", "latin"], weight: "700" });
 
 /** Blank strip at the top and bottom of the sheet, folded under (or glued) to make the tent's base. */
-const FLAP_MM = 15;
+const FLAP_MM = 10;
 const FACE_MM = (297 - 2 * FLAP_MM) / 2;
 /** The 5×7 in design scaled to the face height; the background stretches to the full 105 mm width, the text keeps its proportions. */
 const FACE_SCALE = FACE_MM / 177.8;
@@ -16,21 +16,45 @@ const SHRINK_KEY = "signPrintShrink";
 
 /** One face of a tent card on public/sign-template.jpg (template/template.svg without its text). */
 function Face({ num, label, flip }: { num: number | undefined; label: string; flip?: boolean }) {
-  const lines = signLines(label);
-  const size = signFontPt(lines);
   return (
     <div className={`relative w-[105mm] overflow-hidden ${flip ? "rotate-180" : ""}`} style={{ height: `${FACE_MM}mm` }}>
       <img src="/sign-template.jpg" alt="" className="absolute inset-0 size-full" />
       <div className="absolute left-1/2 top-0 h-[7in] w-[5in] origin-top" style={{ transform: `translateX(-50%) scale(${FACE_SCALE})` }}>
         <div className="absolute inset-x-0 top-[70pt] text-center text-[116pt] leading-[120pt]">{num}</div>
-        <div className="absolute inset-x-[36pt] bottom-[104pt] top-[192pt] flex flex-col items-center justify-center">
-          {lines.map((line) => (
-            <span key={line} className="whitespace-nowrap leading-[1.75]" style={{ fontSize: `${size}pt` }}>
-              {line}
-            </span>
-          ))}
+        <div className="absolute inset-x-[36pt] bottom-[104pt] top-[192pt] flex items-center justify-center">
+          <FitLines lines={signLines(label)} />
         </div>
       </div>
+    </div>
+  );
+}
+
+const BASE_PT = 100;
+
+/** Sizes the label so its widest line spans the white panel edge to edge, shrinking only if the lines would run out of height. */
+function FitLines({ lines }: { lines: string[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<number>();
+  useLayoutEffect(() => {
+    let live = true;
+    // measure with the real font, otherwise the fallback font's widths are used
+    document.fonts.ready.then(() => {
+      const el = ref.current;
+      const box = el?.parentElement;
+      if (!live || !el || !box) return;
+      setSize(BASE_PT * Math.min(box.clientWidth / el.offsetWidth, box.clientHeight / el.offsetHeight));
+    });
+    return () => {
+      live = false;
+    };
+  }, [lines.join("\n")]);
+  return (
+    <div ref={ref} className={`flex flex-col items-center leading-[1.35] ${size ? "" : "invisible"}`} style={{ fontSize: `${size ?? BASE_PT}pt` }}>
+      {lines.map((line) => (
+        <span key={line} className="whitespace-nowrap">
+          {line}
+        </span>
+      ))}
     </div>
   );
 }

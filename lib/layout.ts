@@ -19,13 +19,6 @@ export function signLines(label: string): string[] {
   return label.split(/(?=เจ้า(?:สาว|บ่าว))/).map((l) => l.trim()).filter(Boolean);
 }
 
-/** Largest font size (pt) that keeps the longest line inside the template's white panel. Thai marks take no width. */
-export function signFontPt(lines: string[]): number {
-  const chars = Math.max(1, ...lines.map((l) => l.replace(/[ัิ-ฺ็-๎]/g, "").length));
-  // a label on one line has the room of two, e.g. "VIP"
-  return Math.min(lines.length === 1 ? 84 : 56, Math.floor(270 / (chars * 0.67)));
-}
-
 export function groupKey(p: Pick<Party, "host" | "village">): string {
   return `${p.host}·${p.village}`;
 }

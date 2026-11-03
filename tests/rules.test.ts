@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { carInfos, isGroomSide } from "../lib/cars";
 import { buildParties, normalizeVillage, parseSize, SIGN } from "../lib/importRules";
-import { autoAssign, signFontPt, signLines, tableNumbers, tableWarning } from "../lib/layout";
+import { autoAssign, signLines, tableNumbers, tableWarning } from "../lib/layout";
 import { partyColors, SOLO_COLOR } from "../lib/partyColors";
 import { cleanThai, searchKey } from "../lib/thai";
 import type { Car, Guest, Party, Settings, Sign, Table } from "../lib/types";
@@ -12,12 +12,6 @@ describe("printed signs", () => {
     expect(signLines("เพื่อนเจ้าบ่าว")).toEqual(["เพื่อน", "เจ้าบ่าว"]);
     expect(signLines("กสิกร")).toEqual(["กสิกร"]);
     expect(signLines("เจ้าสาว")).toEqual(["เจ้าสาว"]);
-  });
-
-  it("keeps template size for short labels and shrinks long ones", () => {
-    expect(signFontPt(["ครอบครัว", "เจ้าสาว"])).toBe(56);
-    expect(signFontPt(["เพื่อนร่วมงานบริษัทกสิกรไทย"])).toBeLessThan(56);
-    expect(signFontPt(["VIP"])).toBe(84);
   });
 });
 
