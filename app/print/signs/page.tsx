@@ -7,8 +7,11 @@ import { useStore } from "@/lib/store";
 
 const mali = Mali({ subsets: ["thai", "latin"], weight: "700" });
 
-/** The 5×7 in design scaled to a quarter of A4 (148.5 mm tall); it is 1 mm wider than the cell, so the sides crop evenly. */
-const FACE_SCALE = 148.5 / 177.8;
+/** Blank strip at the top and bottom of the sheet, folded under (or glued) to make the tent's base. */
+const FLAP_MM = 15;
+const FACE_MM = (297 - 2 * FLAP_MM) / 2;
+/** The 5×7 in design scaled to the face height; the background stretches to the full 105 mm width, the text keeps its proportions. */
+const FACE_SCALE = FACE_MM / 177.8;
 const SHRINK_KEY = "signPrintShrink";
 
 /** One face of a tent card on public/sign-template.jpg (template/template.svg without its text). */
@@ -16,9 +19,9 @@ function Face({ num, label, flip }: { num: number | undefined; label: string; fl
   const lines = signLines(label);
   const size = signFontPt(lines);
   return (
-    <div className={`relative h-[148.5mm] w-[105mm] overflow-hidden ${flip ? "rotate-180" : ""}`}>
-      <div className="absolute left-[-0.54mm] top-0 h-[7in] w-[5in] origin-top-left" style={{ transform: `scale(${FACE_SCALE})` }}>
-        <img src="/sign-template.jpg" alt="" className="absolute inset-0 size-full" />
+    <div className={`relative w-[105mm] overflow-hidden ${flip ? "rotate-180" : ""}`} style={{ height: `${FACE_MM}mm` }}>
+      <img src="/sign-template.jpg" alt="" className="absolute inset-0 size-full" />
+      <div className="absolute left-1/2 top-0 h-[7in] w-[5in] origin-top" style={{ transform: `translateX(-50%) scale(${FACE_SCALE})` }}>
         <div className="absolute inset-x-0 top-[70pt] text-center text-[116pt] leading-[120pt]">{num}</div>
         <div className="absolute inset-x-[36pt] bottom-[104pt] top-[192pt] flex flex-col items-center justify-center">
           {lines.map((line) => (
@@ -66,7 +69,7 @@ export default function PrintSigns() {
         <button onClick={() => window.print()} className="min-h-11 shrink-0 rounded-xl bg-accent px-5 font-medium text-white">
           พิมพ์ {sheets.length} แผ่น
         </button>
-        <span className="text-sm text-muted">{tables.length} โต๊ะ · A4 แนวตั้ง · ไม่มีขอบ · ตัดตามเส้นแนวตั้ง พับตามเส้นแนวนอน</span>
+        <span className="text-sm text-muted">{tables.length} โต๊ะ · A4 แนวตั้ง · ไม่มีขอบ · ตัดตามเส้นแนวตั้ง พับตามเส้นแนวนอน · ขอบบน-ล่าง {FLAP_MM / 10} ซม. ไว้พับเป็นฐาน</span>
         <label className="ml-auto flex shrink-0 items-center gap-2 text-sm">
           ย่อชดเชยขอบ
           <select className="min-h-9 rounded-lg border border-line bg-card px-2" value={shrink} onChange={(e) => chooseShrink(Number(e.target.value))}>
@@ -81,7 +84,9 @@ export default function PrintSigns() {
       <div className="flex flex-col items-center gap-6 bg-paper py-6 print:block print:gap-0 print:bg-white print:py-0">
         {sheets.map((pair) => (
           <div key={pair[0].id} className={`sheet relative h-[297mm] w-[210mm] overflow-hidden bg-white shadow print:shadow-none ${mali.className}`} style={{ color: "#7c5a32" }}>
-            <div className="grid size-full grid-cols-2" style={{ transform: `scale(${1 - shrink / 100})` }}>
+            <div className="relative grid size-full grid-cols-2 content-start" style={{ paddingBlock: `${FLAP_MM}mm`, transform: `scale(${1 - shrink / 100})` }}>
+            <span className="absolute inset-x-0 border-t border-dashed border-black/30" style={{ top: `${FLAP_MM}mm` }} />
+            <span className="absolute inset-x-0 border-t border-dashed border-black/30" style={{ bottom: `${FLAP_MM}mm` }} />
             {[true, false].flatMap((flip) =>
               // an odd table count leaves the last sheet's right column empty, so the left one still folds
               [pair[0], pair[1]].map((t, col) => (t ? <Face key={`${col}-${flip}`} num={d.numbers.get(t.id)} label={d.signById.get(t.sign_id!)!.label} flip={flip} /> : <div key={`${col}-${flip}`} />)),
