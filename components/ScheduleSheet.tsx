@@ -25,8 +25,8 @@ function usePersonLabel() {
     if (!guests.length) return "(แขกที่ถูกลบไปแล้ว)";
     const party = guests[0].party_id ? d.partyById.get(guests[0].party_id) : undefined;
     const members = party ? (d.membersByParty.get(party.id) ?? []) : [];
-    if (party && guests.length > 1 && guests.length === members.length && guests.every((g) => g.party_id === party.id)) {
-      return `${partyLabel(party)} (${guests.length} คน)`;
+    if (party && guests.length > 1 && guests.every((g) => g.party_id === party.id && !g.display_name)) {
+      return `${partyLabel(party)} (${guests.length === members.length ? "" : `${guests.length} จาก `}${members.length} คน)`;
     }
     return guests.map((g) => guestLabel(g, g.party_id ? d.partyById.get(g.party_id) : undefined)).join(" + ");
   };
