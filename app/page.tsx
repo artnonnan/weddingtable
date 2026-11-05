@@ -10,6 +10,8 @@ import { PartySheet } from "@/components/PartySheet";
 import { PendingSheet } from "@/components/PendingSheet";
 import { PinSheet } from "@/components/PinSheet";
 import { PickSheet } from "@/components/PickSheet";
+import { ScheduleItemSheet } from "@/components/ScheduleSheet";
+import { ScheduleView } from "@/components/ScheduleView";
 import { SearchView } from "@/components/SearchView";
 import { TableSheet } from "@/components/TableSheet";
 import { useStore, type Tab } from "@/lib/store";
@@ -19,6 +21,7 @@ const TABS: [Tab, string, string][] = [
   ["list", "รายชื่อ", "☰"],
   ["search", "ค้นหา", "⌕"],
   ["cars", "รถ", "🚐"],
+  ["schedule", "กำหนดการ", "🕘"],
   ["more", "เพิ่มเติม", "⋯"],
 ];
 
@@ -97,11 +100,12 @@ export default function Home() {
         {state && tab === "list" && <ListView />}
         {state && tab === "search" && <SearchView />}
         {state && tab === "cars" && <CarsView />}
+        {state && tab === "schedule" && <ScheduleView />}
         {state && tab === "more" && <MoreView />}
       </main>
 
       <nav className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <div className={`mx-auto grid max-w-xl ${canEdit ? "grid-cols-5" : "grid-cols-4"}`}>
+        <div className={`mx-auto grid max-w-xl ${canEdit ? "grid-cols-6" : "grid-cols-5"}`}>
           {tabs.map(([t, label, icon]) => (
             <button
               key={t}
@@ -124,6 +128,7 @@ export default function Home() {
           {s.type === "car" && <CarSheet id={s.id} />}
           {s.type === "carForm" && <CarFormSheet id={s.id} />}
           {s.type === "carPick" && <CarPickSheet carId={s.carId} />}
+          {s.type === "scheduleItem" && <ScheduleItemSheet id={s.id} at={s.at} kind={s.kind} />}
         </div>
       ))}
 

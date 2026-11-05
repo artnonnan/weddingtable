@@ -3,8 +3,9 @@ import { carInfos, isGroomSide } from "../lib/cars";
 import { buildParties, normalizeVillage, parseSize, SIGN } from "../lib/importRules";
 import { autoAssign, signLines, tableNumbers, tableWarning } from "../lib/layout";
 import { partyColors, SOLO_COLOR } from "../lib/partyColors";
+import { driftLabel, fmtTime, parseTime, timeline } from "../lib/schedule";
 import { cleanThai, searchKey } from "../lib/thai";
-import type { Car, Guest, Party, Settings, Sign, Table } from "../lib/types";
+import type { Car, Guest, Party, ScheduleItem, Settings, Sign, Table } from "../lib/types";
 
 describe("printed signs", () => {
   it("breaks before เจ้าสาว / เจ้าบ่าว only", () => {
@@ -108,7 +109,7 @@ const SIGNS: Sign[] = [
   { id: 3, label: "แขกเจ้าสาว", color: "", side: "bride", sort_order: 3 },
   { id: 6, label: "แขกเจ้าบ่าว", color: "", side: "groom", sort_order: 6 },
 ];
-const settings: Settings = { id: 1, bride_side: "left", rows_per_lane: null, reserve_tables: 1, seats_per_table: 8 };
+const settings: Settings = { id: 1, bride_side: "left", rows_per_lane: null, reserve_tables: 1, seats_per_table: 8, schedule_start: 520 };
 
 function fixture(spec: [string, number, string, number][]) {
   let n = 0;
@@ -195,5 +196,43 @@ describe("autoAssign", () => {
     expect(tableWarning(acked, guests.slice(0, 3), byId, SIGNS).shown).toBe("none");
     // a third village joins → warning is back
     expect(tableWarning(acked, guests, byId, SIGNS).shown).toBe("mixed");
+  });
+});
+
+describe("schedule", () => {
+  const item = (sort_order: number, kind: ScheduleItem["kind"], minutes: number, target: number | null = null) =>
+    ({ id: String(sort_order), sort_order, kind, title: "", detail: "", minutes, target, has_people: false, people_count: null, people: [] }) as ScheduleItem;
+
+  it("starts each item when the ones before it end, so a change moves everything after it", () => {
+    const items = [item(1, "section", 0), item(2, "step", 20), item(3, "step", 10, 540), item(4, "section", 0, 570), item(5, "break", 10), item(6, "step", 5)];
+    const t = timeline(items, 520);
+    expect(t.map((x) => fmtTime(x.start))).toEqual(["8:40", "8:40", "9:00", "9:10", "9:10", "9:20"]);
+    expect(t.map((x) => x.no)).toEqual([null, 1, 2, null, null, 1]);
+    expect(fmtTime(t[0].end)).toBe("9:10");
+    expect(fmtTime(t[3].end)).toBe("9:25");
+    expect(t[2].drift).toBe(0);
+    expect(t[3].drift).toBe(-20);
+
+    const longer = timeline(items.map((x) => (x.id === "2" ? { ...x, minutes: 30 } : x)), 520);
+    expect(longer.map((x) => fmtTime(x.start))).toEqual(["8:40", "8:40", "9:10", "9:20", "9:20", "9:30"]);
+    expect(longer[2].drift).toBe(10);
+  });
+
+  it("follows sort_order, not array order", () => {
+    const t = timeline([item(2, "step", 5), item(1, "step", 10)], 600);
+    expect(t.map((x) => [x.item.id, fmtTime(x.start)])).toEqual([
+      ["1", "10:00"],
+      ["2", "10:10"],
+    ]);
+  });
+
+  it("reads and writes times", () => {
+    expect(parseTime("08:40")).toBe(520);
+    expect(parseTime("9.05")).toBe(545);
+    expect(parseTime("1130")).toBe(690);
+    expect(parseTime("25:00")).toBeNull();
+    expect(fmtTime(545)).toBe("9:05");
+    expect(driftLabel(5)).toBe("ช้าไป 5 นาที");
+    expect(driftLabel(-5)).toBe("เร็วไป 5 นาที");
   });
 });

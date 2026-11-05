@@ -20,6 +20,8 @@ export interface Settings {
   rows_per_lane: number | null;
   reserve_tables: number;
   seats_per_table: number;
+  /** minutes after midnight the schedule starts */
+  schedule_start: number;
 }
 
 export interface Sign {
@@ -83,6 +85,26 @@ export interface Car {
   created_at: string;
 }
 
+export type ScheduleKind = "section" | "step" | "break";
+
+/** someone taking part in a step: a guest, or else a typed name (not on the guest list) */
+export type SchedulePerson = { guest_id: string } | { name: string };
+
+export interface ScheduleItem {
+  id: string;
+  sort_order: number;
+  kind: ScheduleKind;
+  title: string;
+  detail: string;
+  minutes: number;
+  /** minutes after midnight this item should start (a ฤกษ์ or the card time) */
+  target: number | null;
+  has_people: boolean;
+  /** how many people the step needs */
+  people_count: number | null;
+  people: SchedulePerson[];
+}
+
 export interface ChangeLogEntry {
   id: number;
   at: string;
@@ -105,4 +127,5 @@ export interface DbState {
   parties: Party[];
   guests: Guest[];
   cars: Car[];
+  schedule: ScheduleItem[];
 }

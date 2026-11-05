@@ -3,14 +3,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { carInfos, isGroomSide, type CarInfo } from "./cars";
 import { partyLabel, tableNumbers, tableWarning, type TableWarning } from "./layout";
+import { fmtTime, timeline, type TimedItem } from "./schedule";
 import { partyColors } from "./partyColors";
 import { buildSearch, type SearchHit } from "./search";
 import { db, must, setEditToken } from "./supabase";
-import { LANE_LABEL, STATUS_LABEL, type Car, type ChangeLogEntry, type DbState, type Guest, type GuestStatus, type Lane, type Party, type Settings, type Sign, type SnapshotMeta, type Table } from "./types";
+import { LANE_LABEL, STATUS_LABEL, type Car, type ChangeLogEntry, type DbState, type Guest, type GuestStatus, type Lane, type Party, type ScheduleItem, type Settings, type Sign, type SnapshotMeta, type Table } from "./types";
 
 // ---------------------------------------------------------------- UI state
 
-export type Tab = "map" | "list" | "search" | "cars" | "more";
+export type Tab = "map" | "list" | "search" | "cars" | "schedule" | "more";
 export type MapMode = "2d" | "3d";
 export type SheetRef =
   | { type: "table"; id: string }
@@ -19,7 +20,9 @@ export type SheetRef =
   | { type: "pending" }
   | { type: "car"; id: string }
   | { type: "carForm"; id: string | null }
-  | { type: "carPick"; carId: string };
+  | { type: "carPick"; carId: string }
+  /** id null = a new item inserted at sort_order `at` */
+  | { type: "scheduleItem"; id: string | null; at?: number; kind?: ScheduleItem["kind"] };
 export interface Moving {
   guestIds: string[];
   label: string;
@@ -45,6 +48,7 @@ export interface Derived {
   carById: Map<string, CarInfo>;
   /** groom's side + VIP: the people the cars tab arranges */
   groomGuests: Guest[];
+  schedule: TimedItem[];
 }
 
 const HOURLY_MS = 60 * 60 * 1000;
@@ -70,6 +74,7 @@ function derive(s: DbState): Derived {
   const seated = people.filter((g) => g.table_id).length;
   const cars = carInfos(s.cars, s.guests, partyById);
   return {
+    schedule: timeline(s.schedule, s.settings.schedule_start),
     cars,
     carById: new Map(cars.map((c) => [c.car.id, c])),
     groomGuests: people.filter((g) => isGroomSide(g.party_id ? partyById.get(g.party_id) : undefined, signById)),
@@ -152,7 +157,13 @@ interface Store {
   deleteCar: (id: string) => Promise<boolean>;
   /** carId null = they come on their own */
   setGuestsCar: (guestIds: string[], carId: string | null, label: string) => Promise<boolean>;
+  saveScheduleItem: (id: string | null, draft: ScheduleDraft, at?: number) => Promise<boolean>;
+  deleteScheduleItem: (id: string) => Promise<boolean>;
+  moveScheduleItem: (id: string, delta: 1 | -1) => Promise<boolean>;
+  setScheduleStart: (min: number) => Promise<boolean>;
 }
+
+export type ScheduleDraft = Pick<ScheduleItem, "kind" | "title" | "detail" | "minutes" | "target" | "has_people" | "people_count" | "people">;
 
 const Ctx = createContext<Store | null>(null);
 
@@ -232,13 +243,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const c = db();
-      const [settings, signs, tables, parties, guests, cars] = await Promise.all([
+      const [settings, signs, tables, parties, guests, cars, schedule] = await Promise.all([
         c.from("settings").select("*").eq("id", 1).single(),
         c.from("signs").select("*").order("sort_order"),
         c.from("tables").select("id,lane,pos,sign_id,warn_ack,checked_at,checked_by"),
         c.from("parties").select("*").order("created_at"),
         c.from("guests").select("id,kind,party_id,member_no,display_name,status,table_id,seat_no,car_id"),
         c.from("cars").select("*"),
+        c.from("schedule_items").select("*").order("sort_order"),
       ]);
       setState({
         settings: must(settings) as Settings,
@@ -247,6 +259,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         parties: must(parties) as Party[],
         guests: must(guests) as Guest[],
         cars: must(cars) as Car[],
+        schedule: must(schedule) as ScheduleItem[],
       });
       setError(null);
     } catch (e) {
@@ -611,6 +624,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setGuestsCar: async (guestIds, carId, label) =>
       run(carId ? "จัดคนขึ้นรถ" : "เอาคนลงจากรถ", `${label} → ${carId ? (d?.carById.get(carId)?.title ?? "") : "มาเอง"}`, async () => {
         must(await db().rpc("set_guests_car", { p_guest_ids: guestIds, p_car: carId }));
+      }),
+    saveScheduleItem: async (id, draft, at) =>
+      run(id ? "แก้กำหนดการ" : "เพิ่มกำหนดการ", `${draft.title} (${draft.minutes} นาที)`, async () => {
+        if (id) {
+          must(await db().from("schedule_items").update(draft).eq("id", id));
+          return;
+        }
+        must(
+          await db().rpc("add_schedule_item", {
+            p_at: at ?? Math.max(0, ...(state?.schedule.map((x) => x.sort_order) ?? [])) + 1,
+            p_kind: draft.kind,
+            p_title: draft.title,
+            p_detail: draft.detail,
+            p_minutes: draft.minutes,
+            p_target: draft.target,
+            p_has_people: draft.has_people,
+            p_people_count: draft.people_count,
+            p_people: draft.people,
+          }),
+        );
+      }),
+    deleteScheduleItem: async (id) =>
+      run("ลบกำหนดการ", state?.schedule.find((x) => x.id === id)?.title ?? id, async () => {
+        must(await db().from("schedule_items").delete().eq("id", id));
+      }),
+    moveScheduleItem: async (id, delta) =>
+      run("เลื่อนลำดับกำหนดการ", `${state?.schedule.find((x) => x.id === id)?.title ?? id} ${delta < 0 ? "ขึ้น" : "ลง"}`, async () => {
+        must(await db().rpc("move_schedule_item", { p_id: id, p_delta: delta }));
+      }),
+    setScheduleStart: async (min) =>
+      run("แก้เวลาเริ่มกำหนดการ", fmtTime(min), async () => {
+        must(await db().from("settings").update({ schedule_start: min }).eq("id", 1));
       }),
   };
 
