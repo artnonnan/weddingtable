@@ -361,15 +361,10 @@ export function ScheduleItemSheet({ id, at, kind }: { id: string | null; at?: nu
   );
 }
 
-/** The name the MC says, large, with the guest-list name under it; or just the guest-list name. */
+/** The name the MC says, large, in place of the guest-list name; or just the guest-list name. */
 function PersonName({ call, label }: { call?: string; label: string }) {
   if (!call?.trim()) return <span className="line-clamp-2 min-w-0 flex-1 break-words">{label}</span>;
-  return (
-    <span className="block min-w-0 flex-1">
-      <span className="block whitespace-pre-line break-words text-base font-semibold leading-snug">{call.trim()}</span>
-      <span className="line-clamp-1 break-words text-xs text-muted">{label}</span>
-    </span>
-  );
+  return <span className="block min-w-0 flex-1 whitespace-pre-line break-words text-base font-semibold leading-snug">{call.trim()}</span>;
 }
 
 function SpecialTag() {
