@@ -64,6 +64,8 @@ export function ScheduleItemSheet({ id, at, kind }: { id: string | null; at?: nu
   const [picking, setPicking] = useState(false);
   const [typed, setTyped] = useState("");
   const [typedSpecial, setTypedSpecial] = useState(false);
+  /** row whose MC name is being typed */
+  const [calling, setCalling] = useState<number | null>(null);
   if (!state || !d || (id && !item)) return null;
 
   const set = (patch: Partial<ScheduleDraft>) => setDraft((x) => ({ ...x, ...patch }));
@@ -73,6 +75,7 @@ export function ScheduleItemSheet({ id, at, kind }: { id: string | null; at?: nu
   const used = box ? boxesUsed(draft.people) : draft.people.length;
   const left = draft.people_count === null ? null : draft.people_count - used;
   const movePerson = (i: number, delta: number) => {
+    setCalling(null);
     const people = [...draft.people];
     const [p] = people.splice(i, 1);
     people.splice(i + delta, 0, p);
@@ -115,9 +118,9 @@ export function ScheduleItemSheet({ id, at, kind }: { id: string | null; at?: nu
             <div className="mb-1 text-xs font-medium text-muted">{count.text}</div>
             <ol className="divide-y divide-line rounded-xl border border-line bg-card empty:hidden">
               {item.people.map((p, i) => (
-                <li key={personKey(p, i)} className="flex min-h-11 items-center gap-2 px-3 text-sm">
+                <li key={personKey(p, i)} className="flex min-h-11 items-start gap-2 px-3 py-2 text-sm">
                   <span className="w-6 shrink-0 text-muted tabular-nums">{i + 1}.</span>
-                  <span className="min-w-0 flex-1">{label(p)}</span>
+                  <PersonName call={p.call} label={label(p)} />
                   {p.special && <SpecialTag />}
                 </li>
               ))}
@@ -130,7 +133,8 @@ export function ScheduleItemSheet({ id, at, kind }: { id: string | null; at?: nu
 
   const save = async () => {
     const people_count = draft.has_people ? draft.people_count : null;
-    const people = draft.has_people ? draft.people : [];
+    // a blank MC name falls back to the guest-list name
+    const people = draft.has_people ? draft.people.map(({ call, ...p }) => (call?.trim() ? { ...p, call: call.trim() } : p)) : [];
     if (await saveScheduleItem(id, { ...draft, title: draft.title.trim(), detail: draft.detail.trim(), minutes: section ? 0 : draft.minutes, people_count, people }, at)) closeSheet();
   };
 
@@ -267,18 +271,39 @@ export function ScheduleItemSheet({ id, at, kind }: { id: string | null; at?: nu
             </div>
             <ol className="divide-y divide-line rounded-xl border border-line empty:hidden">
               {draft.people.map((p, i) => (
-                <li key={personKey(p, i)} className="flex min-h-11 items-center gap-1 px-2 py-1 text-sm">
-                  <span className="w-6 shrink-0 text-muted tabular-nums">{i + 1}.</span>
+                <li key={personKey(p, i)} className="flex min-h-11 items-start gap-1 px-2 py-1.5 text-sm">
+                  <span className="w-6 shrink-0 pt-0.5 text-muted tabular-nums">{i + 1}.</span>
                   <span className="min-w-0 flex-1">
-                    <span className="line-clamp-2 break-words">{label(p)}</span>
-                    {box && (
-                      <button
-                        aria-pressed={!!p.special}
-                        className={`mt-0.5 rounded-full border px-2 text-[11px] font-medium leading-5 ${p.special ? "border-accent bg-accent text-white" : "border-line text-muted"}`}
-                        onClick={() => set({ people: draft.people.map((x, j) => (j === i ? { ...x, special: !x.special } : x)) })}
-                      >
-                        {p.special ? "✓ กล่องพิเศษ (ไม่นับ)" : "กล่องพิเศษ"}
-                      </button>
+                    <PersonName call={p.call} label={label(p)} />
+                    {calling === i ? (
+                      <span className="mt-1 block">
+                        <textarea
+                          autoFocus
+                          rows={2}
+                          className={`${inputClass} py-2 text-sm`}
+                          placeholder={label(p)}
+                          value={p.call ?? ""}
+                          onChange={(e) => set({ people: draft.people.map((x, j) => (j === i ? { ...x, call: e.target.value } : x)) })}
+                        />
+                        <button className="mt-1 min-h-8 rounded-full bg-accent px-3 text-[11px] font-medium text-white" onClick={() => setCalling(null)}>
+                          เสร็จ
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="mt-0.5 flex flex-wrap gap-1">
+                        <button className="rounded-full border border-line px-2 text-[11px] font-medium leading-5 text-accent" onClick={() => setCalling(i)}>
+                          ✎ {p.call?.trim() ? "แก้ชื่อที่พิธีกรอ่าน" : "ชื่อที่พิธีกรอ่าน"}
+                        </button>
+                        {box && (
+                          <button
+                            aria-pressed={!!p.special}
+                            className={`rounded-full border px-2 text-[11px] font-medium leading-5 ${p.special ? "border-accent bg-accent text-white" : "border-line text-muted"}`}
+                            onClick={() => set({ people: draft.people.map((x, j) => (j === i ? { ...x, special: !x.special } : x)) })}
+                          >
+                            {p.special ? "✓ กล่องพิเศษ (ไม่นับ)" : "กล่องพิเศษ"}
+                          </button>
+                        )}
+                      </span>
                     )}
                   </span>
                   <button disabled={i === 0} aria-label="เลื่อนขึ้น" className="size-9 shrink-0 rounded-lg disabled:opacity-25 active:bg-paper" onClick={() => movePerson(i, -1)}>
@@ -287,7 +312,10 @@ export function ScheduleItemSheet({ id, at, kind }: { id: string | null; at?: nu
                   <button disabled={i === draft.people.length - 1} aria-label="เลื่อนลง" className="size-9 shrink-0 rounded-lg disabled:opacity-25 active:bg-paper" onClick={() => movePerson(i, 1)}>
                     ↓
                   </button>
-                  <button aria-label="เอาออก" className="size-9 shrink-0 rounded-lg text-danger active:bg-danger/5" onClick={() => set({ people: draft.people.filter((_, j) => j !== i) })}>
+                  <button aria-label="เอาออก" className="size-9 shrink-0 rounded-lg text-danger active:bg-danger/5" onClick={() => {
+                      setCalling(null);
+                      set({ people: draft.people.filter((_, j) => j !== i) });
+                    }}>
                     ✕
                   </button>
                 </li>
@@ -330,6 +358,17 @@ export function ScheduleItemSheet({ id, at, kind }: { id: string | null; at?: nu
         </div>
       )}
     </Sheet>
+  );
+}
+
+/** The name the MC says, large, with the guest-list name under it; or just the guest-list name. */
+function PersonName({ call, label }: { call?: string; label: string }) {
+  if (!call?.trim()) return <span className="line-clamp-2 min-w-0 flex-1 break-words">{label}</span>;
+  return (
+    <span className="block min-w-0 flex-1">
+      <span className="block whitespace-pre-line break-words text-base font-semibold leading-snug">{call.trim()}</span>
+      <span className="line-clamp-1 break-words text-xs text-muted">{label}</span>
+    </span>
   );
 }
 

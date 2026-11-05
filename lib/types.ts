@@ -90,8 +90,9 @@ export type ScheduleKind = "section" | "step" | "break";
 /**
  * One entry in a step's list: a guest, guests coming up together (a couple: one gift box),
  * or a typed name (not on the guest list). `special` = the parents' own box, not counted.
+ * `call` = how the MC says the name, shown instead of the guest-list name.
  */
-export type SchedulePerson = ({ guest_id: string } | { guest_ids: string[] } | { name: string }) & { special?: boolean };
+export type SchedulePerson = ({ guest_id: string } | { guest_ids: string[] } | { name: string }) & { special?: boolean; call?: string };
 
 export interface ScheduleItem {
   id: string;
