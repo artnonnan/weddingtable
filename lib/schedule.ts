@@ -1,5 +1,5 @@
 // Start times for the schedule. Pure functions (no DB, no React).
-import type { ScheduleItem } from "./types";
+import type { ScheduleItem, SchedulePerson } from "./types";
 
 export interface TimedItem {
   item: ScheduleItem;
@@ -55,4 +55,14 @@ export function parseTime(s: string): number | null {
 export function driftLabel(drift: number): string {
   if (drift === 0) return "ตรงเวลา";
   return drift > 0 ? `ช้าไป ${drift} นาที` : `เร็วไป ${-drift} นาที`;
+}
+
+/** Gift boxes the list uses: one per entry, the parents' special boxes aside. */
+export function boxesUsed(people: SchedulePerson[]): number {
+  return people.filter((p) => !p.special).length;
+}
+
+/** Guest ids already in the list. */
+export function takenGuests(people: SchedulePerson[]): string[] {
+  return people.flatMap((p) => ("guest_id" in p ? [p.guest_id] : "guest_ids" in p ? p.guest_ids : []));
 }

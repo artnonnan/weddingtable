@@ -87,8 +87,11 @@ export interface Car {
 
 export type ScheduleKind = "section" | "step" | "break";
 
-/** someone taking part in a step: a guest, or else a typed name (not on the guest list) */
-export type SchedulePerson = { guest_id: string } | { name: string };
+/**
+ * One entry in a step's list: a guest, guests coming up together (a couple: one gift box),
+ * or a typed name (not on the guest list). `special` = the parents' own box, not counted.
+ */
+export type SchedulePerson = ({ guest_id: string } | { guest_ids: string[] } | { name: string }) & { special?: boolean };
 
 export interface ScheduleItem {
   id: string;
@@ -100,8 +103,10 @@ export interface ScheduleItem {
   /** minutes after midnight this item should start (a ฤกษ์ or the card time) */
   target: number | null;
   has_people: boolean;
-  /** how many people the step needs */
+  /** how many people (or gift boxes) the step needs */
   people_count: number | null;
+  /** box = each entry gets one gift box (ของรับไหว้) */
+  count_unit: "person" | "box";
   people: SchedulePerson[];
 }
 

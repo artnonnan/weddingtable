@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { driftLabel, fmtTime, parseTime, type TimedItem } from "@/lib/schedule";
 import { useStore } from "@/lib/store";
+import { countText } from "./ScheduleSheet";
 import { Button } from "./ui";
 
 function DriftChip({ drift, target }: { drift: number | null; target: number | null }) {
@@ -60,7 +61,7 @@ export function ScheduleView() {
     }
 
     const brk = item.kind === "break";
-    const chosen = item.people.length;
+    const count = item.has_people ? countText(item) : null;
     return (
       <div className={`flex items-start gap-2 rounded-xl border px-3 py-2 ${brk ? "border-dashed border-line bg-paper" : "border-line bg-card"}`}>
         <button onClick={open} className="flex min-w-0 flex-1 items-start gap-3 text-left">
@@ -77,14 +78,13 @@ export function ScheduleView() {
             {(item.has_people || item.target !== null) && (
               <span className="mt-1 flex flex-wrap gap-1">
                 <DriftChip drift={t.drift} target={item.target} />
-                {item.has_people && (
+                {count && (
                   <span
                     className={`inline-block rounded-full px-2 text-[11px] font-medium leading-5 ${
-                      item.people_count !== null && chosen !== item.people_count ? "bg-unsure/15 text-unsure" : "bg-accent-soft text-accent"
+                      count.tone === "over" ? "bg-danger text-white" : count.tone === "short" ? "bg-unsure/15 text-unsure" : "bg-accent-soft text-accent"
                     }`}
                   >
-                    ผู้ร่วมพิธี {chosen}
-                    {item.people_count !== null && `/${item.people_count}`} คน
+                    {count.text}
                   </span>
                 )}
               </span>

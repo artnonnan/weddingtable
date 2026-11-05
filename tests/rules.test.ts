@@ -3,7 +3,7 @@ import { carInfos, isGroomSide } from "../lib/cars";
 import { buildParties, normalizeVillage, parseSize, SIGN } from "../lib/importRules";
 import { autoAssign, signLines, tableNumbers, tableWarning } from "../lib/layout";
 import { partyColors, SOLO_COLOR } from "../lib/partyColors";
-import { driftLabel, fmtTime, parseTime, timeline } from "../lib/schedule";
+import { boxesUsed, driftLabel, fmtTime, parseTime, takenGuests, timeline } from "../lib/schedule";
 import { cleanThai, searchKey } from "../lib/thai";
 import type { Car, Guest, Party, ScheduleItem, Settings, Sign, Table } from "../lib/types";
 
@@ -201,7 +201,7 @@ describe("autoAssign", () => {
 
 describe("schedule", () => {
   const item = (sort_order: number, kind: ScheduleItem["kind"], minutes: number, target: number | null = null) =>
-    ({ id: String(sort_order), sort_order, kind, title: "", detail: "", minutes, target, has_people: false, people_count: null, people: [] }) as ScheduleItem;
+    ({ id: String(sort_order), sort_order, kind, title: "", detail: "", minutes, target, has_people: false, people_count: null, people: [], count_unit: "person" }) as ScheduleItem;
 
   it("starts each item when the ones before it end, so a change moves everything after it", () => {
     const items = [item(1, "section", 0), item(2, "step", 20), item(3, "step", 10, 540), item(4, "section", 0, 570), item(5, "break", 10), item(6, "step", 5)];
@@ -224,6 +224,12 @@ describe("schedule", () => {
       ["1", "10:00"],
       ["2", "10:10"],
     ]);
+  });
+
+  it("counts one gift box per entry, couples included, the parents' special boxes aside", () => {
+    const people = [{ guest_ids: ["a", "b"] }, { guest_id: "c" }, { name: "คุณพ่อถวัลย์ - คุณแม่พริ้งเพรา", special: true }, { name: "ลุง" }];
+    expect(boxesUsed(people)).toBe(3);
+    expect(takenGuests(people)).toEqual(["a", "b", "c"]);
   });
 
   it("reads and writes times", () => {

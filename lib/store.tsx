@@ -163,7 +163,7 @@ interface Store {
   setScheduleStart: (min: number) => Promise<boolean>;
 }
 
-export type ScheduleDraft = Pick<ScheduleItem, "kind" | "title" | "detail" | "minutes" | "target" | "has_people" | "people_count" | "people">;
+export type ScheduleDraft = Pick<ScheduleItem, "kind" | "title" | "detail" | "minutes" | "target" | "has_people" | "people_count" | "people" | "count_unit">;
 
 const Ctx = createContext<Store | null>(null);
 
@@ -642,6 +642,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             p_has_people: draft.has_people,
             p_people_count: draft.people_count,
             p_people: draft.people,
+            p_count_unit: draft.count_unit,
           }),
         );
       }),
