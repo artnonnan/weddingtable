@@ -21,9 +21,10 @@ function Face({ num, label, flip }: { num: number | undefined; label: string; fl
       <img src="/sign-template.jpg" alt="" className="absolute inset-0 size-full" />
       <div className="absolute left-1/2 top-0 h-[7in] w-[5in] origin-top" style={{ transform: `translateX(-50%) scale(${FACE_SCALE})` }}>
         <div className="absolute inset-x-0 top-[70pt] text-center text-[116pt] leading-[120pt]">{num}</div>
-        <div className="absolute inset-x-[36pt] bottom-[104pt] top-[192pt] flex items-center justify-center">
+        {/* a sign with no number (organiser, band…) lets its text rise into the number's space, so the letters can be larger */}
+        <div className={`absolute inset-x-[36pt] bottom-[104pt] flex items-center justify-center ${num === undefined ? "top-[110pt]" : "top-[192pt]"}`}>
           {/* a spare table without a name prints its number only */}
-          {label.trim() && <FitLines lines={signLines(label)} />}
+          {label.trim() && <FitLines lines={signLines(label)} tight={num === undefined} />}
         </div>
       </div>
     </div>
@@ -39,7 +40,7 @@ interface Card {
 }
 
 /** Sizes the label so its widest line spans the white panel edge to edge, shrinking only if the lines would run out of height. */
-function FitLines({ lines }: { lines: string[] }) {
+function FitLines({ lines, tight }: { lines: string[]; tight?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<number>();
   useLayoutEffect(() => {
@@ -56,7 +57,7 @@ function FitLines({ lines }: { lines: string[] }) {
     };
   }, [lines.join("\n")]);
   return (
-    <div ref={ref} className={`flex flex-col items-center leading-[1.35] ${size ? "" : "invisible"}`} style={{ fontSize: `${size ?? BASE_PT}pt` }}>
+    <div ref={ref} className={`flex flex-col items-center ${tight ? "leading-[1.15]" : "leading-[1.35]"} ${size ? "" : "invisible"}`} style={{ fontSize: `${size ?? BASE_PT}pt` }}>
       {lines.map((line) => (
         <span key={line} className="whitespace-nowrap">
           {line}
