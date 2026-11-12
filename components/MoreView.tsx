@@ -46,6 +46,8 @@ export function MoreView() {
         </div>
       </Card>
 
+      <PrintExtrasCard />
+
       <HistoryCard />
     </div>
   );
@@ -71,6 +73,72 @@ function SignsCard() {
               onBlur={(e) => {
                 const v = e.target.value.trim();
                 if (v && v !== s.label) void updateSign(s.id, { label: v });
+              }}
+            />
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+/** Tent cards printed after the tables only: signs without a number, and spare tables numbered on from the last one. */
+function PrintExtrasCard() {
+  const { state, d, setPrintExtras, busy } = useStore();
+  if (!state || !d) return null;
+  const specials = state.settings.print_specials ?? [];
+  const spares = state.settings.print_spares ?? [];
+  const last = d.numbers.size;
+  const saveSpecials = (next: string[]) => void setPrintExtras({ print_specials: next });
+  const saveSpares = (next: string[]) => void setPrintExtras({ print_spares: next });
+
+  return (
+    <Card title="ป้ายพิเศษ & โต๊ะเผื่อ (เฉพาะตอนพิมพ์ ไม่ขึ้นในผัง)">
+      <p className="mb-2 text-xs text-muted">ป้ายพิเศษ ไม่มีเลขโต๊ะ · กด Enter เพื่อขึ้นบรรทัดใหม่บนป้าย</p>
+      <ul className="mb-2 space-y-2">
+        {specials.map((label, i) => (
+          <li key={`${i}-${label}`} className="flex items-start gap-2">
+            <textarea
+              rows={Math.max(1, label.split("\n").length)}
+              className={`${inputClass} py-2`}
+              defaultValue={label}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                if (v && v !== label) saveSpecials(specials.map((x, j) => (j === i ? v : x)));
+              }}
+            />
+            <Button variant="danger" disabled={busy} onClick={() => saveSpecials(specials.filter((_, j) => j !== i))}>
+              ลบ
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <Button className="mb-4 w-full" disabled={busy} onClick={() => saveSpecials([...specials, "ป้ายใหม่"])}>
+        + เพิ่มป้ายพิเศษ
+      </Button>
+
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-sm">โต๊ะเผื่อ</span>
+        <Button disabled={busy || spares.length === 0} onClick={() => saveSpares(spares.slice(0, -1))}>
+          −
+        </Button>
+        <span className="w-8 text-center font-medium">{spares.length}</span>
+        <Button disabled={busy || spares.length >= 20} onClick={() => saveSpares([...spares, ""])}>
+          +
+        </Button>
+        <span className="text-xs text-muted">{spares.length ? `โต๊ะ ${last + 1}–${last + spares.length}` : "ไม่มี"}</span>
+      </div>
+      <ul className="space-y-2">
+        {spares.map((label, i) => (
+          <li key={`${i}-${label}`} className="flex items-center gap-2">
+            <span className="w-10 shrink-0 text-center text-lg font-semibold">{last + i + 1}</span>
+            <input
+              className={inputClass}
+              placeholder="มีแค่เลข (ใส่ชื่อได้ถ้าต้องการ)"
+              defaultValue={label}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                if (v !== label) saveSpares(spares.map((x, j) => (j === i ? v : x)));
               }}
             />
           </li>

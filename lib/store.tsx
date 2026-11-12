@@ -161,6 +161,7 @@ interface Store {
   deleteScheduleItem: (id: string) => Promise<boolean>;
   moveScheduleItem: (id: string, delta: 1 | -1) => Promise<boolean>;
   setScheduleStart: (min: number) => Promise<boolean>;
+  setPrintExtras: (patch: Partial<Pick<Settings, "print_specials" | "print_spares">>) => Promise<boolean>;
 }
 
 export type ScheduleDraft = Pick<ScheduleItem, "kind" | "title" | "detail" | "minutes" | "target" | "has_people" | "people_count" | "people" | "count_unit">;
@@ -658,6 +659,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       run("แก้เวลาเริ่มกำหนดการ", fmtTime(min), async () => {
         must(await db().from("settings").update({ schedule_start: min }).eq("id", 1));
       }),
+    setPrintExtras: async (patch) =>
+      run(
+        "แก้ป้ายพิเศษ/โต๊ะเผื่อ",
+        [patch.print_specials && `ป้ายพิเศษ: ${patch.print_specials.join(", ").replace(/\n/g, " ")}`, patch.print_spares && `โต๊ะเผื่อ ${patch.print_spares.length} โต๊ะ`].filter(Boolean).join(" · "),
+        async () => {
+          must(await db().from("settings").update(patch).eq("id", 1));
+        },
+      ),
   };
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;

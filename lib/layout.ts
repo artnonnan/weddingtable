@@ -14,9 +14,9 @@ export function guestLabel(g: Guest, party: Party | undefined): string {
   return party.size > 1 ? `${base} ${g.member_no}/${party.size}` : base;
 }
 
-/** A printed sign's label, broken before เจ้าสาว / เจ้าบ่าว: "ญาติเจ้าสาว" → ["ญาติ", "เจ้าสาว"]. */
+/** A printed sign's label, broken at line breaks and before เจ้าสาว / เจ้าบ่าว: "ญาติเจ้าสาว" → ["ญาติ", "เจ้าสาว"]. */
 export function signLines(label: string): string[] {
-  return label.split(/(?=เจ้า(?:สาว|บ่าว))/).map((l) => l.trim()).filter(Boolean);
+  return label.split(/\n|(?=เจ้า(?:สาว|บ่าว))/).map((l) => l.trim()).filter(Boolean);
 }
 
 export function groupKey(p: Pick<Party, "host" | "village">): string {

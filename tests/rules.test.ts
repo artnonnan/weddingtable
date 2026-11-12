@@ -109,7 +109,7 @@ const SIGNS: Sign[] = [
   { id: 3, label: "แขกเจ้าสาว", color: "", side: "bride", sort_order: 3 },
   { id: 6, label: "แขกเจ้าบ่าว", color: "", side: "groom", sort_order: 6 },
 ];
-const settings: Settings = { id: 1, bride_side: "left", rows_per_lane: null, reserve_tables: 1, seats_per_table: 8, schedule_start: 520 };
+const settings: Settings = { id: 1, bride_side: "left", rows_per_lane: null, reserve_tables: 1, seats_per_table: 8, schedule_start: 520, print_specials: [], print_spares: [] };
 
 function fixture(spec: [string, number, string, number][]) {
   let n = 0;

@@ -22,6 +22,10 @@ export interface Settings {
   seats_per_table: number;
   /** minutes after midnight the schedule starts */
   schedule_start: number;
+  /** tent cards with no table number, printed after the tables */
+  print_specials: string[];
+  /** spare tables numbered on from the last one; '' = number only */
+  print_spares: string[];
 }
 
 export interface Sign {

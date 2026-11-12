@@ -28,7 +28,7 @@ const guests: Guest[] = parties.flatMap((p) =>
     status: "confirmed" as const, table_id: null, seat_no: null,
   })),
 );
-const settings: Settings = { id: 1, bride_side: "left", rows_per_lane: null, reserve_tables: 0, seats_per_table: 8, schedule_start: 520 };
+const settings: Settings = { id: 1, bride_side: "left", rows_per_lane: null, reserve_tables: 0, seats_per_table: 8, schedule_start: 520, print_specials: [], print_spares: [] };
 
 console.log(`parties ${parties.length}, people ${guests.length}, skipped ${skipped.length}`);
 for (const s of skipped) console.log(`  skip ${s.sheet}#${s.row} ${s.label}: ${s.reason}`);
